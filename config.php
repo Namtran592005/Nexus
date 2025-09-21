@@ -58,9 +58,14 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     $pdo->exec('PRAGMA foreign_keys = ON;');
+    
+    // <<< THÊM DÒNG NÀY ĐỂ BẬT AUTO-VACUUM >>>
+    $pdo->exec('PRAGMA auto_vacuum = FULL;'); 
 
     if (!$db_exists) {
         $pdo->beginTransaction();
+        // Câu lệnh PRAGMA auto_vacuum phải được chạy trước khi tạo bảng đầu tiên trong database
+        // Việc đặt nó ở trên đã đảm bảo điều này.
         $pdo->exec("CREATE TABLE `file_system` (`id` INTEGER PRIMARY KEY, `parent_id` INTEGER, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `mime_type` TEXT, `size` INTEGER DEFAULT 0, `content` BLOB, `is_deleted` INTEGER NOT NULL DEFAULT 0, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `modified_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `deleted_at` TEXT, FOREIGN KEY (`parent_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);");
         $pdo->exec("CREATE TRIGGER update_file_system_modified_at AFTER UPDATE ON file_system FOR EACH ROW BEGIN UPDATE file_system SET modified_at = CURRENT_TIMESTAMP WHERE id = OLD.id; END;");
         $pdo->exec("CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);");

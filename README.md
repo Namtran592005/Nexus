@@ -95,5 +95,3 @@ Mọi đóng góp, báo cáo lỗi và đề xuất cải tiến đều được
 Dự án này được phát hành dưới Giấy phép MIT. Xem tệp `LICENSE` để biết thêm chi tiết.
 
 ---
-
-[Về đầu trang](#nexus-drive)

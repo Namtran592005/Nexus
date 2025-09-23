@@ -518,7 +518,9 @@ if ($currentPage === 'browse') {
         }
 
         .file-table .file-text {
-            word-break: break-all;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             font-weight: 500;
         }
 

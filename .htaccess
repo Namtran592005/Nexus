@@ -1,0 +1,22 @@
+# Bật module RewriteEngine để có thể làm việc với URL sau này
+RewriteEngine On
+
+# Xử lý lỗi MIME type cho các tệp JavaScript Module (.mjs)
+AddType text/javascript .mjs
+
+# Ngăn chặn việc truy cập trực tiếp vào các tệp nhạy cảm
+<Files "users.php">
+    Order allow,deny
+    Deny from all
+</Files>
+<Files "bootstrap.php">
+    Order allow,deny
+    Deny from all
+</Files>
+<FilesMatch "\.sqlite$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Chặn việc liệt kê nội dung thư mục
+Options -Indexes

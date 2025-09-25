@@ -1,5 +1,7 @@
 <?php
-require_once 'config.php';
+define('IS_PUBLIC_PAGE', true); // Prevents auth check in bootstrap.php
+require_once 'bootstrap.php';
+
 $error_message = '';
 
 if (AUTH_ENABLED === false) {
@@ -38,15 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo APP_NAME; ?> - Đăng nhập</title>
-    <link rel="icon" type="image/x-icon" href="./src/image/favicon.ico"> <!-- Bạn có thể thay favicon mới ở đây -->
+    <link rel="icon" type="image/x-icon" href="./src/image/favicon.ico">
     <link rel="stylesheet" href="./src/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
-        /* CSS VẪN GIỮ NGUYÊN NHƯ PHIÊN BẢN TRƯỚC VÌ NÓ ĐÃ ĐẸP VÀ TRUNG LẬP */
-        :root {
+    /* CSS is unchanged */
+    :root {
         --bg-gradient-start: #f2f2f7;
         --bg-gradient-end: #d9d9e0;
         --card-bg: rgba(255, 255, 255, 0.7);
@@ -57,9 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         --border-color: #d1d1d6;
         --shadow-color: rgba(0, 0, 0, 0.1);
         --card-backdrop-blur: 15px;
-        }
+    }
 
-        @media (prefers-color-scheme: dark) {
+    @media (prefers-color-scheme: dark) {
         :root {
             --bg-gradient-start: #161618;
             --bg-gradient-end: #000000;
@@ -69,9 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             --border-color: #3a3a3c;
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
-        }
+    }
 
-        body {
+    body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         display: flex;
         justify-content: center;
@@ -83,9 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
         transition: background 0.5s ease;
-        }
+    }
 
-        @keyframes gradientBG {
+    @keyframes gradientBG {
         0% {
             background-position: 0% 50%;
         }
@@ -97,9 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         100% {
             background-position: 0% 50%;
         }
-        }
+    }
 
-        .login-container {
+    .login-container {
         background-color: var(--card-bg);
         border-radius: 20px;
         box-shadow: 0 8px 32px 0 var(--shadow-color);
@@ -113,23 +116,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         transform: scale(0.95);
         opacity: 0;
         animation: fadeInScale 0.6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
-        }
+    }
 
-        @keyframes fadeInScale {
+    @keyframes fadeInScale {
         to {
             transform: scale(1);
             opacity: 1;
         }
-        }
+    }
 
-        .logo {
+    .logo {
         font-size: 4.5em;
         color: var(--accent-color);
         margin-bottom: 10px;
         animation: logoFloat 3s ease-in-out infinite;
-        }
+    }
 
-        @keyframes logoFloat {
+    @keyframes logoFloat {
 
         0%,
         100% {
@@ -139,35 +142,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         50% {
             transform: translateY(-10px);
         }
-        }
+    }
 
-        h1 {
+    h1 {
         margin: 0 0 5px 0;
         font-size: 2.2em;
         font-weight: 600;
         color: var(--text-primary);
-        }
+    }
 
-        .subtitle {
+    .subtitle {
         margin-bottom: 30px;
         color: var(--text-secondary);
         font-size: 1.1em;
-        }
+    }
 
-        .form-group {
+    .form-group {
         position: relative;
         margin-bottom: 25px;
-        }
+    }
 
-        .form-group .icon {
+    .form-group .icon {
         position: absolute;
         left: 15px;
         top: 50%;
         transform: translateY(-50%);
         color: var(--text-secondary);
-        }
+    }
 
-        .form-group input {
+    .form-group input {
         width: 100%;
         padding: 15px 15px 15px 45px;
         border: 1px solid var(--border-color);
@@ -177,20 +180,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         background-color: transparent;
         color: var(--text-primary);
         transition: all 0.3s ease;
-        }
+    }
 
-        .form-group input:focus {
+    .form-group input:focus {
         outline: none;
         border-color: var(--accent-color);
         box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
-        }
+    }
 
-        .form-group input::placeholder {
+    .form-group input::placeholder {
         color: var(--text-secondary);
         opacity: 0.8;
-        }
+    }
 
-        .btn-submit {
+    .btn-submit {
         width: 100%;
         padding: 15px;
         background-color: var(--accent-color);
@@ -202,35 +205,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         cursor: pointer;
         transition: all 0.3s ease;
         margin-top: 10px;
-        }
+    }
 
-        .btn-submit:hover {
+    .btn-submit:hover {
         background-color: var(--accent-color-hover);
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
-        }
+    }
 
-        .message-box {
+    .message-box {
         padding: 12px;
         border-radius: 8px;
         margin-bottom: 20px;
         text-align: center;
         font-weight: 500;
         animation: shake 0.5s;
-        }
+    }
 
-        .message-box.error {
+    .message-box.error {
         background-color: rgba(255, 59, 48, 0.2);
         color: #ff3b30;
-        }
+    }
 
-        .message-box.success {
+    .message-box.success {
         background-color: rgba(52, 199, 89, 0.2);
         color: #34c759;
         animation: none;
-        }
+    }
 
-        @keyframes shake {
+    @keyframes shake {
 
         0%,
         100% {
@@ -244,33 +247,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         75% {
             transform: translateX(5px);
         }
-        }
+    }
 
-        .register-link {
+    .register-link {
         margin-top: 25px;
         color: var(--text-secondary);
-        }
+    }
 
-        .register-link a {
+    .register-link a {
         color: var(--accent-color);
         text-decoration: none;
         font-weight: 500;
-        }
+    }
     </style>
 </head>
+
 <body>
     <div class="login-container">
-        <!-- THAY ĐỔI ICON Ở ĐÂY -->
         <div class="logo"><i class="fas fa-cloud-bolt"></i></div>
-        <!-- THAY ĐỔI TIÊU ĐỀ Ở ĐÂY -->
         <h1><?php echo APP_NAME; ?></h1>
         <p class="subtitle">Đăng nhập để tiếp tục</p>
 
         <?php if (!empty($error_message)): ?>
-            <div class="message-box error"><?php echo $error_message; ?></div>
+        <div class="message-box error"><?php echo $error_message; ?></div>
         <?php endif; ?>
         <?php if (!empty($success_message)): ?>
-            <div class="message-box success"><?php echo $success_message; ?></div>
+        <div class="message-box success"><?php echo $success_message; ?></div>
         <?php endif; ?>
 
         <form method="POST" action="login.php">
@@ -285,14 +287,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn-submit">
                 <i class="fas fa-arrow-right"></i>
             </button>
-            <!-- START: THÊM LIÊN KẾT ĐĂNG KÝ -->
             <?php if (ALLOW_REGISTRATION === true): ?>
             <p class="register-link">
                 Chưa có tài khoản? <a href="register.php">Tạo tài khoản</a>
             </p>
             <?php endif; ?>
-            <!-- END: THÊM LIÊN KẾT ĐĂNG KÝ -->
         </form>
     </div>
 </body>
+
 </html>

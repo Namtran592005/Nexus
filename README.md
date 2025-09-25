@@ -1,6 +1,6 @@
 # Nexus Drive
 
-![Nexus Drive Screenshot](./screenshot.png)
+![Nexus Drive Screenshot](./Screenshot.png)
 *Giao diện chính của Nexus Drive*
 
 ## Giới thiệu
@@ -116,5 +116,6 @@ Mở tệp `bootstrap.php` để tùy chỉnh các cài đặt cốt lõi:
 ## Giấy phép
 
 Dự án này được phát hành dưới [Giấy phép MIT](LICENSE).
+
 
 ---

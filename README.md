@@ -114,7 +114,7 @@ This project is licensed under the [MIT License](LICENSE).
 ---
 ---
 
-# 🇻🇳 Giới thiệu (Tiếng Việt)
+# Giới thiệu (Tiếng Việt)
 
 <p align="center">
   <strong>Một giải pháp lưu trữ đám mây cá nhân (self-hosted) mạnh mẽ, hiện đại và siêu nhẹ.</strong>

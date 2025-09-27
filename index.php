@@ -1577,6 +1577,21 @@ if (isset($_SESSION["message"])) {
         width: 100%;
         height: 100%;
     }
+
+    /* CSS cho lớp phủ trong Preview Modal */
+    .preview-overlay {
+        display: none;
+        /* Mặc định ẩn */
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        /* Nằm trên iframe nhưng dưới popover */
+        background: transparent;
+        /* Trong suốt */
+    }
     </style>
 </head>
 
@@ -2236,14 +2251,23 @@ function updateToolbarState() {
 function showActionPopover(targetElement, e) {
     e.preventDefault();
     e.stopPropagation();
+
+    // --- GIẢI PHÁP MỚI: Vô hiệu hóa con trỏ trên iframe ---
+    const iframe = $('#previewContent iframe');
+    if (iframe) {
+        iframe.style.pointerEvents = 'none';
+    }
+    // --- KẾT THÚC PHẦN THAY ĐỔI ---
+
     const itemElement = targetElement.closest('.selectable');
     if (!itemElement) return;
+
+    // ... (phần còn lại của hàm giữ nguyên không đổi)
     const id = itemElement.dataset.id,
         name = itemElement.dataset.name,
         type = itemElement.dataset.type,
         shareId = itemElement.dataset.shareId || '';
     let content = '';
-
     if (G.currentPage === 'trash') {
         content =
             `<button type="button" class="popover-item" onclick="batchRestoreSelectedWrapper(${id})"><i class="fas fa-redo-alt"></i> Restore</button>
@@ -2260,7 +2284,6 @@ function showActionPopover(targetElement, e) {
                         <button type="button" class="popover-item" onclick="openRenameModal(${id},'${escapeJS(name)}', '${type}')"><i class="fas fa-edit"></i> Rename</button>
                         <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(false, ${id})"><i class="fas fa-trash-alt"></i> Trash</button>`;
     }
-
     const popover = $('#actionPopover');
     popover.innerHTML = content;
     popover.classList.add('show');
@@ -2302,6 +2325,54 @@ function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
     $('#page-stats').textContent = `${currentItemCount} items`;
     updateToolbarState();
     closeDetailsPanel();
+}
+
+async function openShareModal(fileId) {
+    openModal('shareModal');
+    $('#shareFileId').value = fileId;
+
+    const linkSection = $('#share-link-section');
+    const createSection = $('#create-share-link-section');
+    const optionsSection = $('#share-options-section');
+    const removeBtn = $('#removeShareLinkBtn');
+    const saveBtn = $('#saveShareSettingsBtn');
+    const linkInput = $('#shareLinkInput');
+
+    // Reset and show loading state
+    linkSection.style.display = 'none';
+    createSection.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    optionsSection.style.display = 'none';
+    removeBtn.style.display = 'none';
+    saveBtn.textContent = 'Create Link';
+    $('#share-modal-body').querySelectorAll('input').forEach(i => {
+        if (i.type === 'checkbox') i.checked = true;
+        else if (i.type !== 'hidden') i.value = '';
+    });
+
+    const result = await apiCall('get_share_details', {
+        file_id: fileId
+    });
+
+    if (result.success && result.details) {
+        // Link đã tồn tại
+        linkSection.style.display = 'block';
+        createSection.style.display = 'none';
+        optionsSection.style.display = 'block';
+        removeBtn.style.display = 'block';
+        saveBtn.textContent = 'Update Settings';
+
+        linkInput.value = `${G.BASE_URL}share.php?id=${result.details.id}`;
+        $('#sharePassword').placeholder = result.details.has_password ? 'Password is set. Enter new to change.' :
+            'Protect with a password';
+        $('#shareExpiry').value = result.details.expires_at ? result.details.expires_at.split(' ')[0] : '';
+        $('#shareAllowDownload').checked = result.details.allow_download == 1;
+    } else {
+        // Link chưa tồn tại
+        createSection.innerHTML =
+            '<p style="text-align: center; color: var(--text-secondary);">This file is not currently shared.</p>';
+        createSection.style.display = 'block';
+        optionsSection.style.display = 'block'; // Vẫn hiện option để tạo link mới
+    }
 }
 
 async function batchDeleteSelected(isPermanent = false) {
@@ -2530,10 +2601,20 @@ function closeModal(id) {
     const modal = $(`#${id}`);
     if (!modal) return;
     modal.classList.remove('show');
-    if (id === 'previewModal' && G.plyrInstance) {
-        G.plyrInstance.destroy();
-        G.plyrInstance = null;
+    if (id === 'previewModal') {
+        if (G.plyrInstance) {
+            G.plyrInstance.destroy();
+            G.plyrInstance = null;
+        }
         $('#previewContent').innerHTML = '';
+
+        // --- THÊM ĐOẠN NÀY VÀO ---
+        // Đảm bảo kích hoạt lại con trỏ khi đóng preview modal
+        const iframe = $('#previewContent iframe');
+        if (iframe) {
+            iframe.style.pointerEvents = 'auto';
+        }
+        // --- KẾT THÚC PHẦN THÊM MỚI ---
     }
 }
 
@@ -3145,12 +3226,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     searchInput.addEventListener('blur', hideLiveSearch);
 
+    // Tìm đến listener này trong DOMContentLoaded
     window.addEventListener('click', e => {
         if (e.target.classList.contains('modal')) closeModal(e.target.id);
+
         const popover = $('#actionPopover');
         if (popover.classList.contains('show') && !e.target.closest('.action-popover') && !e.target
             .closest('.action-btn')) {
             popover.classList.remove('show');
+
+            // --- GIẢI PHÁP MỚI: Kích hoạt lại con trỏ trên iframe ---
+            const iframe = $('#previewContent iframe');
+            if (iframe) {
+                iframe.style.pointerEvents = 'auto';
+            }
+            // --- KẾT THÚC PHẦN THAY ĐỔI ---
         }
     });
     $$('.tab-nav-item').forEach(tab => {

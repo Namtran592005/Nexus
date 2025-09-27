@@ -1592,6 +1592,52 @@ if (isset($_SESSION["message"])) {
         background: transparent;
         /* Trong suốt */
     }
+
+    /* TÙY CHỈNH THANH CUỘN CHO GIAO DIỆN */
+
+    /* Cho các trình duyệt WebKit (Chrome, Safari, Edge, Opera) */
+    ::-webkit-scrollbar {
+        width: 8px;
+        /* Chiều rộng cho thanh cuộn dọc */
+        height: 8px;
+        /* Chiều cao cho thanh cuộn ngang */
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--bg-primary);
+        /* Màu nền của rãnh cuộn */
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: var(--bg-tertiary);
+        /* Màu của con trượt */
+        border-radius: 4px;
+        /* Bo tròn góc con trượt */
+        border: 2px solid var(--bg-primary);
+        /* Tạo khoảng cách giữa con trượt và rãnh */
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--border-color);
+        /* Màu con trượt khi di chuột qua */
+    }
+
+    /* Cho Firefox */
+    /* Áp dụng cho các phần tử có thể cuộn */
+    .content-area,
+    .sidebar,
+    #details-panel-body,
+    #live-search-results,
+    .modal-body,
+    #folder-tree-container,
+    #upload-progress-list,
+    #previewContent,
+    #pdf-viewer-container {
+        scrollbar-width: thin;
+        /* 'auto', 'thin', 'none' */
+        scrollbar-color: var(--bg-tertiary) var(--bg-primary);
+        /* màu con trượt và màu rãnh */
+    }
     </style>
 </head>
 

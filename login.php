@@ -1,40 +1,42 @@
 <?php
-define('IS_PUBLIC_PAGE', true); // Prevents auth check in bootstrap.php
-require_once 'bootstrap.php';
+define("IS_PUBLIC_PAGE", true); // Prevents auth check in bootstrap.php
+require_once "bootstrap.php";
 
-$error_message = '';
+$error_message = "";
 
 if (AUTH_ENABLED === false) {
-    header('Location: index.php');
-    exit;
+    header("Location: index.php");
+    exit();
 }
 
-if (isset($_SESSION['is_logged_in']) && $_SESSION['is_logged_in'] === true) {
-    header('Location: index.php');
-    exit;
+if (isset($_SESSION["is_logged_in"]) && $_SESSION["is_logged_in"] === true) {
+    header("Location: index.php");
+    exit();
 }
 
-$success_message = '';
-if (isset($_SESSION['message'])) {
-    if ($_SESSION['message']['type'] === 'success') {
-        $success_message = $_SESSION['message']['text'];
+$success_message = "";
+if (isset($_SESSION["message"])) {
+    if ($_SESSION["message"]["type"] === "success") {
+        $success_message = $_SESSION["message"]["text"];
     }
-    unset($_SESSION['message']);
+    unset($_SESSION["message"]);
 }
 
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $username = $_POST["username"] ?? "";
+    $password = $_POST["password"] ?? "";
     $users = AUTH_USERS;
 
-    if (isset($users[$username]) && password_verify($password, $users[$username])) {
-        $_SESSION['is_logged_in'] = true;
-        $_SESSION['username'] = $username;
-        header('Location: index.php');
-        exit;
+    if (
+        isset($users[$username]) &&
+        password_verify($password, $users[$username])
+    ) {
+        $_SESSION["is_logged_in"] = true;
+        $_SESSION["username"] = $username;
+        header("Location: index.php");
+        exit();
     } else {
-        $error_message = 'Invalid username or password.';
+        $error_message = "Invalid username or password.";
     }
 }
 ?>

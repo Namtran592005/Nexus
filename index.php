@@ -55,14 +55,14 @@ if (isset($_SESSION["message"])) {
     <link rel="stylesheet" href="./src/custom-fonts.css">
     <link rel="stylesheet" href="./src/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="./src/css/plyr.css" />
-    <link rel="stylesheet" href="./src/css/prism-tomorrow.min.css" />
-    <link rel="stylesheet" href="./src/css/prism-line-numbers.min.css" />
     <script src="./src/js/plyr.js"></script>
-    <script src="./src/js/prism.min.js"></script>
-    <script src="./src/js/prism-line-numbers.min.js"></script>
-    <script src="./src/js/prism-core.min.js"></script>
-    <script src="./src/js/prism-autoloader.min.js"></script>
     <script src="./src/js/chart.js"></script>
+    <script src="./src/js/docx-preview.js"></script>
+    <script src="./src/js/xlsx.full.min.js"></script>
+    <!-- ACE Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ext-themelist.js"></script>
+
     <style>
     /* --- CSS is unchanged, it remains the same as in your original file --- */
     :root {
@@ -76,43 +76,137 @@ if (isset($_SESSION["message"])) {
 
     :root,
     body.dark-mode {
-        --bg-primary: #161618;
-        --bg-secondary: #1d1d20;
-        --bg-tertiary: #2e2e32;
-        --text-primary: #f0f0f0;
-        --text-secondary: #a0a0a0;
-        --text-accent: #0a84ff;
-        --border-color: #3a3a3c;
-        --highlight-color: #2a2a2d;
-        --selection-color: rgba(10, 132, 255, 0.25);
-        --shadow-color: rgba(0, 0, 0, 0.2);
-        --danger-color: #ff453a;
-        --danger-color-hover: #ff5e55;
-        --success-color: #30d158;
+        /* Bảng màu tối mới, lấy cảm hứng từ GitHub Dark & VSCode Dark */
+        --bg-primary: #0d1117;
+        /* Nền chính, xám đen rất đậm có ánh xanh */
+        --bg-secondary: #161b22;
+        /* Các panel chính, header, sidebar */
+        --bg-tertiary: #21262d;
+        /* Nền cho input, các khối phụ */
+
+        --text-primary: #c9d1d9;
+        /* Màu chữ trắng ngà, dịu mắt hơn trắng tinh */
+        --text-secondary: #8b949e;
+        /* Màu chữ phụ, xám xanh nhạt */
+        --text-accent: #58a6ff;
+        /* Màu xanh dương nhấn mạnh, sáng vừa phải */
+
+        --border-color: #30363d;
+        /* Viền xám, đủ để phân tách mà không quá sáng */
+        --highlight-color: #21262d;
+        /* Màu khi hover, đồng bộ bg-tertiary */
+        --selection-color: rgba(56, 139, 253, 0.15);
+        /* Màu chọn, xanh nhạt */
+
+        --shadow-color: rgba(0, 0, 0, 0.4);
+        /* Bóng đổ cho chế độ tối */
+
+        --danger-color: #f85149;
+        /* Màu đỏ cảnh báo, sáng hơn một chút */
+        --danger-color-hover: #da3633;
+        --success-color: #3fb950;
+        /* Màu xanh lá thành công, dễ nhìn hơn */
+
         --plyr-color-main: var(--text-accent);
     }
 
     body.light-mode {
-        --bg-primary: #f2f2f7;
+        /* Bảng màu mới, hiện đại và dễ chịu hơn */
+        --bg-primary: #f6f8fa;
+        /* Nền xám xanh rất nhạt, sạch sẽ */
         --bg-secondary: #ffffff;
-        --bg-tertiary: #e5e5ea;
-        --text-primary: #1c1c1e;
-        --text-secondary: #636366;
-        --border-color: #d1d1d6;
-        --highlight-color: #e8e8ed;
-        --selection-color: rgba(0, 122, 255, 0.15);
-        --shadow-color: rgba(0, 0, 0, 0.08);
-        --danger-color: #d9534f;
-        --danger-color-hover: #c9302c;
-        --success-color: #28a745;
+        /* Các panel chính màu trắng tinh */
+        --bg-tertiary: #f0f2f5;
+        /* Nền cho input, các khối phụ */
+
+        --text-primary: #1f2328;
+        /* Màu chữ đen đậm, rõ ràng */
+        --text-secondary: #57606a;
+        /* Màu chữ phụ, xám xanh */
+        --text-accent: #0969da;
+        /* Màu xanh dương nhấn mạnh, chuẩn GitHub/VSCode */
+
+        --border-color: #d0d7de;
+        /* Viền xám nhạt, tinh tế */
+        --highlight-color: #f0f2f5;
+        /* Màu khi hover, đồng bộ với bg-tertiary */
+        --selection-color: rgba(56, 139, 253, 0.15);
+        /* Màu chọn, xanh nhạt hơn */
+
+        --shadow-color: rgba(140, 149, 159, 0.15);
+        /* Bóng đổ nhẹ nhàng hơn */
+
+        --danger-color: #d73a49;
+        /* Màu đỏ cảnh báo */
+        --danger-color-hover: #b92534;
+        --success-color: #1a7f37;
+        /* Màu xanh lá thành công */
+
         --plyr-color-main: var(--text-accent);
+    }
+
+    /* --- CSS MỚI CHO NỀN ĐỘNG --- */
+    .animated-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        /* Đặt nó ở lớp dưới cùng */
+        --gradient-color-1: #0d1117;
+        --gradient-color-2: #161b22;
+        --gradient-color-3: #0969da;
+        --gradient-color-4: #58a6ff;
+
+        background: linear-gradient(-45deg, var(--gradient-color-1), var(--gradient-color-2), var(--gradient-color-3), var(--gradient-color-4));
+        background-size: 400% 400%;
+        animation: gradient-animation 15s ease infinite;
+        opacity: 0.2;
+        /* Giảm độ mờ để không quá chói */
+        transition: opacity 0.5s ease;
+    }
+
+    /* Định nghĩa animation */
+    @keyframes gradient-animation {
+        0% {
+            background-position: 0% 50%;
+        }
+
+        50% {
+            background-position: 100% 50%;
+        }
+
+        100% {
+            background-position: 0% 50%;
+        }
+    }
+
+    /* Điều chỉnh màu sắc cho chế độ sáng */
+    body.light-mode .animated-bg {
+        --gradient-color-1: #f6f8fa;
+        --gradient-color-2: #ffffff;
+        --gradient-color-3: #58a6ff;
+        --gradient-color-4: #0969da;
+        opacity: 0.15;
+        /* Độ mờ ở chế độ sáng cần nhẹ hơn nữa */
+    }
+
+    /* Điều chỉnh màu sắc cho chế độ tối */
+    body.dark-mode .animated-bg {
+        --gradient-color-1: #0d1117;
+        --gradient-color-2: #161b22;
+        --gradient-color-3: #1f2328;
+        --gradient-color-4: #0969da;
+        opacity: 0.1;
+        /* Giảm opacity cho nền tối để dịu mắt hơn */
     }
 
     /* General Body Styles */
     body {
         font-family: var(--font-family-sans);
         margin: 0;
-        background-color: var(--bg-primary);
+        background-color: transparent;
         color: var(--text-primary);
         overflow: hidden;
         height: 100vh;
@@ -203,6 +297,7 @@ if (isset($_SESSION["message"])) {
         flex: 1;
         overflow: hidden;
         position: relative;
+        background-color: var(--bg-primary);
     }
 
     .sidebar {
@@ -316,6 +411,7 @@ if (isset($_SESSION["message"])) {
         flex: 1;
         padding: 30px;
         overflow-y: auto;
+        background-color: transparent;
     }
 
     .main-content.details-panel-active .content-area {
@@ -862,6 +958,7 @@ if (isset($_SESSION["message"])) {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        flex-grow: 1;
     }
 
     .modal-header .close-button {
@@ -872,7 +969,33 @@ if (isset($_SESSION["message"])) {
         cursor: pointer;
         line-height: 1;
         transition: transform var(--transition-speed-fast) ease;
+        order: 3;
     }
+
+    .modal-header .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+        padding-right: 15px;
+    }
+
+    .modal-header .header-actions .btn,
+    .modal-header .header-actions select {
+        padding: 5px 10px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 0.9em;
+        cursor: pointer;
+    }
+
+    .modal-header .header-actions .btn-save {
+        background-color: var(--success-color);
+        color: white;
+    }
+
 
     .modal-header .close-button:hover {
         transform: rotate(90deg);
@@ -1121,6 +1244,7 @@ if (isset($_SESSION["message"])) {
         background: black;
         height: 100%;
         overflow: hidden;
+        position: relative;
     }
 
     #previewModal .modal-body img {
@@ -1136,30 +1260,22 @@ if (isset($_SESSION["message"])) {
     }
 
     #previewContent {
-        overflow: auto;
+        width: 100%;
+        height: 100%;
     }
+
+    #code-editor-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
 
     #previewModal .plyr--video,
     #previewModal .plyr--audio {
         max-height: calc(90vh - 55px);
-    }
-
-    #pdf-viewer-container {
-        width: 100%;
-        height: calc(90vh - 55px);
-        overflow: auto;
-        background-color: #525659;
-    }
-
-    #pdf-canvas {
-        display: block;
-        margin: 0 auto;
-    }
-
-    #previewContent pre[class*="language-"] {
-        max-height: calc(90vh - 55px);
-        margin: 0;
-        background: #282c34;
     }
 
     .search-form {
@@ -1241,7 +1357,6 @@ if (isset($_SESSION["message"])) {
 
     .overlay {
         display: none;
-        /* Quan trọng */
         position: fixed;
         top: 0;
         left: 0;
@@ -1249,7 +1364,6 @@ if (isset($_SESSION["message"])) {
         height: 100%;
         background: rgba(0, 0, 0, 0.5);
         z-index: 149;
-        /* Phải thấp hơn z-index của modal */
         opacity: 0;
         transition: opacity var(--transition-speed-normal) ease;
     }
@@ -1417,7 +1531,6 @@ if (isset($_SESSION["message"])) {
             display: inline-flex;
         }
 
-        /* Show on mobile */
         .file-table tr:hover .file-actions,
         .file-table tr.selected .file-actions,
         .file-actions {
@@ -1431,7 +1544,6 @@ if (isset($_SESSION["message"])) {
         transition: opacity 0.2s ease;
     }
 
-    /* CSS cho Cây thư mục trong Modal Di chuyển */
     .folder-tree ul {
         list-style: none;
         padding-left: 20px;
@@ -1469,7 +1581,6 @@ if (isset($_SESSION["message"])) {
         transform: rotate(-90deg);
     }
 
-    /* Cải thiện giao diện cho Form trong Modal */
     .modal .form-group {
         margin-bottom: 15px;
     }
@@ -1512,7 +1623,6 @@ if (isset($_SESSION["message"])) {
         cursor: pointer;
     }
 
-    /* CSS Mới cho Tab About */
     .about-section .app-description {
         max-width: 450px;
         margin: 0 auto 25px auto;
@@ -1550,80 +1660,100 @@ if (isset($_SESSION["message"])) {
         color: var(--text-primary);
     }
 
-    /* CSS Nâng cấp cho Modal xem trước toàn màn hình */
     #previewModal .modal-content-fullscreen {
         width: 90vw;
-        /* Giảm một chút để không quá sát cạnh */
         max-width: 1400px;
-        /* Thêm max-width cho màn hình siêu rộng */
         height: 90vh;
         max-height: 90vh;
-        /* Sử dụng flexbox để kiểm soát layout bên trong */
         display: flex;
         flex-direction: column;
     }
 
-    /* Bắt buộc modal-body chiếm hết không gian còn lại */
     #previewModal .modal-content-fullscreen .modal-body {
         flex-grow: 1;
-        /* Rất quan trọng */
         padding: 0;
         overflow: hidden;
-        /* Body không cần cuộn, iframe sẽ cuộn */
     }
 
     #previewModal .modal-content-fullscreen #previewContent,
     #previewModal .modal-content-fullscreen #previewContent iframe {
         width: 100%;
         height: 100%;
+        border: none;
     }
 
-    /* CSS cho lớp phủ trong Preview Modal */
     .preview-overlay {
         display: none;
-        /* Mặc định ẩn */
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
         z-index: 1;
-        /* Nằm trên iframe nhưng dưới popover */
         background: transparent;
-        /* Trong suốt */
+    }
+
+    .sheet-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9em;
+        color: var(--text-primary);
+    }
+
+    .sheet-table th,
+    .sheet-table td {
+        border: 1px solid var(--border-color);
+        padding: 8px;
+        text-align: left;
+    }
+
+    .sheet-table th {
+        background-color: var(--bg-tertiary);
+        font-weight: bold;
+    }
+
+    /* --- CSS MỚI CHO CHẾ ĐỘ XEM TRƯỚC TOÀN MÀN HÌNH --- */
+    body.preview-maximized .header,
+    body.preview-maximized .main-content {
+        display: none;
+        /* Ẩn giao diện chính của app */
+    }
+
+    .modal.modal-maximized {
+        padding: 0;
+        background: none;
+    }
+
+    .modal.modal-maximized .modal-content {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
     }
 
     /* TÙY CHỈNH THANH CUỘN CHO GIAO DIỆN */
-
-    /* Cho các trình duyệt WebKit (Chrome, Safari, Edge, Opera) */
     ::-webkit-scrollbar {
         width: 8px;
-        /* Chiều rộng cho thanh cuộn dọc */
         height: 8px;
-        /* Chiều cao cho thanh cuộn ngang */
     }
 
     ::-webkit-scrollbar-track {
         background: var(--bg-primary);
-        /* Màu nền của rãnh cuộn */
     }
 
     ::-webkit-scrollbar-thumb {
         background-color: var(--bg-tertiary);
-        /* Màu của con trượt */
         border-radius: 4px;
-        /* Bo tròn góc con trượt */
         border: 2px solid var(--bg-primary);
-        /* Tạo khoảng cách giữa con trượt và rãnh */
     }
 
     ::-webkit-scrollbar-thumb:hover {
         background-color: var(--border-color);
-        /* Màu con trượt khi di chuột qua */
     }
 
-    /* Cho Firefox */
-    /* Áp dụng cho các phần tử có thể cuộn */
     .content-area,
     .sidebar,
     #details-panel-body,
@@ -1631,12 +1761,9 @@ if (isset($_SESSION["message"])) {
     .modal-body,
     #folder-tree-container,
     #upload-progress-list,
-    #previewContent,
-    #pdf-viewer-container {
+    #previewContent {
         scrollbar-width: thin;
-        /* 'auto', 'thin', 'none' */
         scrollbar-color: var(--bg-tertiary) var(--bg-primary);
-        /* màu con trượt và màu rãnh */
     }
     </style>
 </head>
@@ -1645,6 +1772,7 @@ if (isset($_SESSION["message"])) {
 $_COOKIE["theme"] === "light"
     ? "light-mode"
     : "dark-mode"; ?>">
+    <div class="animated-bg"></div>
     <div id="toast-container"></div>
     <div class="header">
         <div class="left-section">
@@ -1727,6 +1855,8 @@ $_COOKIE["theme"] === "light"
                         style="display: none;"><i class="fas fa-redo-alt"></i> <span>Restore</span></button>
                     <button id="batch-delete-btn" class="icon-btn disabled" onclick="batchDeleteSelected(false)"><i
                             class="fas fa-trash"></i> <span>Delete</span></button>
+                    <button id="batch-unshare-btn" class="icon-btn disabled" onclick="batchRemoveShareLinks()"
+                        style="display: none;"><i class="fas fa-user-slash"></i> <span>Unshare</span></button>
                 </div>
                 <div class="right-actions">
                     <button type="button" class="icon-btn" id="list-view-btn" onclick="setViewMode('list')"
@@ -1879,8 +2009,14 @@ $_COOKIE["theme"] === "light"
     <div id="previewModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="previewModalTitle"></h2><button class="close-button" onclick="closeModal('previewModal')"><i
-                        class="fas fa-times"></i></button>
+                <h2 id="previewModalTitle"></h2>
+                <div id="previewHeaderActions" class="header-actions" style="display: none;"></div>
+                <!-- NÚT MỚI ĐƯỢC THÊM -->
+                <button id="previewMaximizeBtn" class="icon-btn" onclick="togglePreviewFullscreen()" title="Maximize"
+                    style="font-size: 1em; margin-left: auto; margin-right: 10px;">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="close-button" onclick="closeModal('previewModal')"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div id="previewContent"></div>
@@ -1989,6 +2125,7 @@ const G = {
     currentPath: '',
     storageChartInstance: null,
     plyrInstance: null,
+    aceEditorInstance: null,
     viewMode: 'list',
     itemsToMove: [],
     destinationFolderId: null
@@ -2012,28 +2149,21 @@ function showToast(message, type = 'success') {
 
 async function apiCall(action, data = {}, method = 'POST', showToastOnError = true) {
     try {
-        let response;
-        if (method === 'POST') {
-            const formData = new FormData();
-            formData.append('action', action);
-            for (const key in data) {
-                if (data[key] instanceof File) {
-                    formData.append(key, data[key], data[key].name);
-                } else if (Array.isArray(data[key])) {
-                    data[key].forEach(value => formData.append(key + '[]', value));
-                } else {
-                    formData.append(key, data[key]);
-                }
-            }
-            response = await fetch('api.php', {
-                method: 'POST',
-                body: formData
-            });
-        } else {
-            const params = new URLSearchParams(data);
-            params.append('action', action);
-            response = await fetch(`api.php?${params.toString()}`);
-        }
+        const isJson = !(data instanceof FormData) && method === 'POST';
+
+        const response = await fetch('api.php' + (method === 'GET' ? '?' + new URLSearchParams({
+            action,
+            ...data
+        }) : ''), {
+            method: method,
+            headers: isJson ? {
+                'Content-Type': 'application/json'
+            } : {},
+            body: method === 'POST' ? (isJson ? JSON.stringify({
+                action,
+                ...data
+            }) : data) : undefined
+        });
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -2059,6 +2189,28 @@ async function apiCall(action, data = {}, method = 'POST', showToastOnError = tr
         return Promise.reject(error);
     }
 }
+
+async function batchRemoveShareLinks() {
+    const selectedItems = $$('.selectable.selected');
+    if (selectedItems.length === 0) return;
+
+    // Lấy file_id (được lưu trong data-id)
+    const selectedFileIds = selectedItems.map(el => el.dataset.id);
+
+    const message =
+        `Are you sure you want to stop sharing ${selectedFileIds.length} item(s)? The public links will no longer work.`;
+    showConfirmModal('Confirm Unshare', message, async () => {
+        const result = await apiCall('remove_share_link', {
+            file_ids: selectedFileIds
+        });
+        if (result.success) {
+            showToast(result.message);
+            // Tải lại view "Shared" để cập nhật danh sách
+            navigateToPath('?view=shared', true);
+        }
+    });
+}
+
 
 function renderMainContent(data) {
     G.currentPage = data.view;
@@ -2096,19 +2248,35 @@ function renderMainContent(data) {
     }
 
     $('#newFolderForm input[name="parent_id"]').value = G.currentFolderId;
+
+    // --- CẬP NHẬT LOGIC HIỂN THỊ NÚT ---
+    const newFolderBtn = $('.toolbar .left-actions .icon-btn[onclick="openNewFolderModal()"]');
     const batchRestoreBtn = $('#batch-restore-btn');
     const batchDeleteBtn = $('#batch-delete-btn');
     const batchMoveBtn = $('#batch-move-btn');
+    const batchDownloadBtn = $('#batch-download-btn');
+    const batchUnshareBtn = $('#batch-unshare-btn');
 
-    if (data.view === 'trash') {
-        batchRestoreBtn.style.display = 'flex';
-        batchDeleteBtn.querySelector('span').textContent = 'Delete Permanently';
-        batchMoveBtn.style.display = 'none';
-    } else {
-        batchRestoreBtn.style.display = 'none';
-        batchDeleteBtn.querySelector('span').textContent = 'Delete';
+    // Ẩn tất cả các nút hành động theo mặc định, sau đó bật lại các nút cần thiết cho view hiện tại
+    [newFolderBtn, batchRestoreBtn, batchDeleteBtn, batchMoveBtn, batchDownloadBtn, batchUnshareBtn].forEach(btn => btn
+        .style.display = 'none');
+
+    if (data.view === 'browse' || data.view === 'recents' || data.view === 'search') {
+        if (data.view === 'browse') newFolderBtn.style.display = 'flex';
         batchMoveBtn.style.display = 'flex';
+        batchDownloadBtn.style.display = 'flex';
+        batchDeleteBtn.style.display = 'flex';
+        batchDeleteBtn.querySelector('span').textContent = 'Delete';
+    } else if (data.view === 'trash') {
+        batchRestoreBtn.style.display = 'flex';
+        batchDeleteBtn.style.display = 'flex';
+        batchDeleteBtn.querySelector('span').textContent = 'Delete Permanently';
+    } else if (data.view === 'shared') {
+        batchDownloadBtn.style.display = 'flex';
+        batchUnshareBtn.style.display = 'flex';
     }
+    // --- KẾT THÚC CẬP NHẬT ---
+
 
     let contentHTML = '';
     if (data.items.length === 0) {
@@ -2189,7 +2357,8 @@ function renderFileRowHTML(item) {
 
     let nameCellContent;
     if (item.type === 'folder' && (G.currentPage === 'browse' || G.currentPage === 'search')) {
-        const path = G.currentPage === 'browse' ? item.relative_path : item.full_path;
+        const path = G.currentPage === 'browse' ? item.relative_path : (item.full_path ? item.full_path + '/' + item
+            .name : item.name);
         const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
         nameCellContent =
             `<a href="${linkUrl}"><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></a>`;
@@ -2221,7 +2390,7 @@ function renderGridItemHTML(item) {
         const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
         clickHandler = `onclick="navigateToPath('${linkUrl}')"`;
     } else if (item.type === 'file') {
-        clickHandler = `ondblclick="openPreviewModal('${escapeJS(nameEscaped)}', ${item.id})"`;
+        clickHandler = `ondblclick="openPreviewModal(${item.id},'${escapeJS(nameEscaped)}')"`;
     }
 
     return `<div class="grid-item selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}" ${clickHandler}>
@@ -2286,6 +2455,9 @@ function updateToolbarState() {
     $('#batch-delete-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-download-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-move-btn').classList.toggle('disabled', selectedCount === 0 || G.currentPage === 'trash');
+    // --- THÊM DÒNG NÀY ---
+    if ($('#batch-unshare-btn')) $('#batch-unshare-btn').classList.toggle('disabled', selectedCount === 0);
+    // ---
     if ($('#batch-restore-btn')) $('#batch-restore-btn').classList.toggle('disabled', selectedCount === 0);
     const totalRows = $$('.selectable').length;
     const selectAllCheckbox = $('#select-all-checkbox');
@@ -2298,17 +2470,9 @@ function showActionPopover(targetElement, e) {
     e.preventDefault();
     e.stopPropagation();
 
-    // --- GIẢI PHÁP MỚI: Vô hiệu hóa con trỏ trên iframe ---
-    const iframe = $('#previewContent iframe');
-    if (iframe) {
-        iframe.style.pointerEvents = 'none';
-    }
-    // --- KẾT THÚC PHẦN THAY ĐỔI ---
-
     const itemElement = targetElement.closest('.selectable');
     if (!itemElement) return;
 
-    // ... (phần còn lại của hàm giữ nguyên không đổi)
     const id = itemElement.dataset.id,
         name = itemElement.dataset.name,
         type = itemElement.dataset.type,
@@ -2323,7 +2487,7 @@ function showActionPopover(targetElement, e) {
             content +=
                 `<a class="popover-item" href="api.php?action=download_file&id=${id}"><i class="fas fa-download"></i> Download</a>
                             <button type="button" class="popover-item" onclick="openShareModal(${id})"><i class="fas fa-share-alt"></i> Share</button>
-                            <button type="button" class="popover-item" onclick="openPreviewModal('${escapeJS(name)}', ${id})"><i class="fas fa-eye"></i> View</button>`;
+                            <button type="button" class="popover-item" onclick="openPreviewModal(${id},'${escapeJS(name)}')"><i class="fas fa-eye"></i> View</button>`;
         }
         content +=
             `<button type="button" class="popover-item" onclick="openMoveModalWithSingleItem(${id})"><i class="fas fa-folder-open"></i> Move</button>
@@ -2442,7 +2606,7 @@ async function batchDeleteSelected(isPermanent = false) {
         apiCall('delete', {
                 ids: selectedIds,
                 force_delete: (G.currentPage === 'trash' || isPermanent)
-            }, 'POST', false)
+            })
             .catch(error => {
                 showToast(`Failed to delete items: ${error.message}. Restoring view.`, 'danger');
                 navigateToPath(window.location.search, true);
@@ -2618,7 +2782,7 @@ async function performLiveSearch(query) {
     resultsContainer.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
     const result = await apiCall('live_search', {
         q: query
-    });
+    }, 'GET');
     if (result.success && result.items.length > 0) {
         resultsContainer.innerHTML = result.items.map(item => {
             const fileInfo = getFileIconJS(item.name, item.type === 'folder');
@@ -2640,6 +2804,12 @@ function hideLiveSearch() {
 }
 
 function openModal(id) {
+    // THÊM LOGIC MỚI: Tự động đóng popover khi mở modal
+    const popover = $('#actionPopover');
+    if (popover && popover.classList.contains('show')) {
+        popover.classList.remove('show');
+    }
+    // Giữ nguyên logic cũ
     $(`#${id}`).classList.add('show');
 }
 
@@ -2647,20 +2817,31 @@ function closeModal(id) {
     const modal = $(`#${id}`);
     if (!modal) return;
     modal.classList.remove('show');
+
     if (id === 'previewModal') {
+        // Hủy các instance media
         if (G.plyrInstance) {
             G.plyrInstance.destroy();
             G.plyrInstance = null;
         }
+        if (G.aceEditorInstance) {
+            G.aceEditorInstance.destroy();
+            G.aceEditorInstance = null;
+        }
         $('#previewContent').innerHTML = '';
 
-        // --- THÊM ĐOẠN NÀY VÀO ---
-        // Đảm bảo kích hoạt lại con trỏ khi đóng preview modal
-        const iframe = $('#previewContent iframe');
-        if (iframe) {
-            iframe.style.pointerEvents = 'auto';
+        // --- LOGIC MỚI: Reset trạng thái fullscreen khi đóng ---
+        if (modal.classList.contains('modal-maximized')) {
+            const body = document.body;
+            const btnIcon = $('#previewMaximizeBtn i');
+
+            modal.classList.remove('modal-maximized');
+            body.classList.remove('preview-maximized');
+
+            btnIcon.classList.remove('fa-compress');
+            btnIcon.classList.add('fa-expand');
+            $('#previewMaximizeBtn').title = 'Maximize';
         }
-        // --- KẾT THÚC PHẦN THÊM MỚI ---
     }
 }
 
@@ -2768,18 +2949,40 @@ function openRenameModal(id, oldName, type) {
     input.focus();
     input.select();
 }
-async function openPreviewModal(name, id) {
+
+async function saveCodeFromEditor(fileId) {
+    if (!G.aceEditorInstance) return;
+    const content = G.aceEditorInstance.getValue();
+
+    const result = await apiCall('save_file_content', {
+        file_id: fileId,
+        content: content
+    });
+
+    if (result.success) {
+        showToast(result.message);
+        // Optional: Update size in the details panel if it's open
+        const detailsSize = document.querySelector('#details-panel-body dd:nth-of-type(3)');
+        if (detailsSize && $('#details-panel').classList.contains('active')) {
+            detailsSize.textContent = result.new_size_formatted;
+        }
+    }
+}
+
+async function openPreviewModal(id, name) {
     const modal = $('#previewModal');
     const modalContent = modal.querySelector('.modal-content');
     openModal('previewModal');
 
     const title = $('#previewModalTitle');
     const content = $('#previewContent');
+    const headerActions = $('#previewHeaderActions');
+
     title.textContent = name;
     content.innerHTML =
         '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-
-    // Luôn reset kích thước modal về mặc định khi mở
+    headerActions.innerHTML = '';
+    headerActions.style.display = 'none';
     modalContent.classList.remove('modal-content-fullscreen');
 
     const d = await apiCall('get_preview_data', {
@@ -2793,41 +2996,110 @@ async function openPreviewModal(name, id) {
 
     let html = '';
     switch (d.type) {
+        case 'pdf_viewer':
+            modalContent.classList.add('modal-content-fullscreen');
+            html = `<iframe src="${d.data}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+            content.innerHTML = html;
+            break;
+        case 'client_office_viewer':
+            modalContent.classList.add('modal-content-fullscreen');
+            content.innerHTML =
+                `<div style="padding:20px; text-align:center;">
+                    <i class="fas fa-circle-notch fa-spin"></i> Loading document preview...
+                    <p style="font-size:0.8em; color:var(--text-secondary); margin-top:10px;">Please wait, larger files may take a moment.</p>
+                 </div>`;
+            try {
+                const response = await fetch(d.data.fileUrl);
+                if (!response.ok) throw new Error('Failed to download file for preview.');
+                const blob = await response.blob();
+
+                content.innerHTML = ''; // Clear loading indicator
+
+                if (d.data.mimeType.includes('wordprocessingml')) {
+                    docx.renderAsync(blob, content);
+                } else if (d.data.mimeType.includes('spreadsheetml') || d.data.mimeType.includes('ms-excel')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {
+                            type: 'array'
+                        });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const html_string = XLSX.utils.sheet_to_html(worksheet, {
+                            className: 'sheet-table'
+                        });
+                        content.innerHTML =
+                            `<div style="padding: 15px; overflow: auto; height: 100%;">${html_string}</div>`;
+                    };
+                    reader.readAsArrayBuffer(blob);
+                }
+            } catch (error) {
+                console.error("Client viewer error:", error);
+                content.innerHTML =
+                    `<p style="padding:20px; color:var(--danger-color)">Could not load preview: ${error.message}</p>`;
+            }
+            break;
         case 'image':
             html = `<img src="${d.data}" alt="${name}">`;
+            content.innerHTML = html;
             break;
         case 'video':
             html =
                 `<video id="media-player" playsinline controls><source src="${d.data}" type="${d.mime_type}"></video>`;
+            content.innerHTML = html;
+            G.plyrInstance = new Plyr('#media-player', {
+                autoplay: true
+            });
             break;
         case 'audio':
             html = `<audio id="media-player" controls><source src="${d.data}" type="${d.mime_type}"></audio>`;
+            content.innerHTML = html;
+            G.plyrInstance = new Plyr('#media-player', {
+                autoplay: true
+            });
             break;
-        case 'pdf':
-            // Thêm class để phóng to modal
+        case 'code_editor':
             modalContent.classList.add('modal-content-fullscreen');
-            // Thêm hash parameter để PDF tự động zoom-to-width
-            html = `<iframe src="${d.data}#view=fitH" style="width: 100%; height: 100%; border: none;"></iframe>`;
-            break;
-        case 'code':
-            html =
-                `<pre class="line-numbers" style="width:100%;height:100%;margin:0;max-height:calc(90vh - 55px);"><code class="language-${d.language}">${escapeHtml(d.data)}</code></pre>`;
+            html = `<div id="code-editor-container"></div>`;
+            content.innerHTML = html;
+            headerActions.style.display = 'flex';
+
+            const themeSelector = document.createElement('select');
+            themeSelector.id = 'aceThemeSelector';
+            const themelist = ace.require("ace/ext/themelist");
+            themelist.themes.forEach(theme => {
+                let option = new Option(theme.caption, theme.theme);
+                themeSelector.add(option);
+            });
+            themeSelector.value = 'ace/theme/tomorrow_night';
+            themeSelector.onchange = () => G.aceEditorInstance.setTheme(themeSelector.value);
+
+            const saveButton = document.createElement('button');
+            saveButton.innerHTML = '<i class="fas fa-save"></i> Save';
+            saveButton.className = 'btn btn-save';
+            saveButton.onclick = () => saveCodeFromEditor(id);
+
+            headerActions.appendChild(themeSelector);
+            headerActions.appendChild(saveButton);
+
+            G.aceEditorInstance = ace.edit("code-editor-container");
+            G.aceEditorInstance.setTheme("ace/theme/tomorrow_night");
+            G.aceEditorInstance.session.setMode("ace/mode/" + d.language);
+            G.aceEditorInstance.setValue(d.data, -1);
+            G.aceEditorInstance.setOptions({
+                fontSize: "14px",
+                showPrintMargin: false
+            });
             break;
         default:
             html =
                 `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-file fa-3x" style="margin-bottom: 15px;"></i><p>No preview available for <strong>${escapeHtml(d.data.name)}</strong>.</p><p>Size: ${d.data.size}</p></div>`;
+            content.innerHTML = html;
             break;
     }
-    content.innerHTML = html;
-
-    if (d.type === 'video' || d.type === 'audio') {
-        G.plyrInstance = new Plyr('#media-player', {
-            autoplay: true
-        });
-    } else if (d.type === 'code') {
-        Prism.highlightAllUnder(content);
-    }
 }
+
 async function saveShareSettings() {
     const fileId = $('#shareFileId').value;
     const password = $('#sharePassword').value;
@@ -2873,69 +3145,6 @@ function copyShareLink() {
     document.execCommand('copy');
     showToast('Link copied to clipboard!', 'info');
 }
-async function openPreviewModal(name, id) {
-    const modal = $('#previewModal');
-    const modalContent = modal.querySelector('.modal-content');
-    openModal('previewModal');
-
-    const title = $('#previewModalTitle');
-    const content = $('#previewContent');
-    title.textContent = name;
-    content.innerHTML =
-        '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-
-    // Reset kích thước modal về mặc định
-    modalContent.classList.remove('modal-content-fullscreen');
-
-    const d = await apiCall('get_preview_data', {
-        id: id
-    });
-
-    if (!d.success) {
-        content.innerHTML = `<p style="padding:20px;">${d.message}</p>`;
-        return;
-    }
-
-    let html = '';
-    switch (d.type) {
-        case 'image':
-            html = `<img src="${d.data}" alt="${name}">`;
-            break;
-        case 'video':
-            html =
-                `<video id="media-player" playsinline controls><source src="${d.data}" type="${d.mime_type}"></video>`;
-            break;
-        case 'audio':
-            html = `<audio id="media-player" controls><source src="${d.data}" type="${d.mime_type}"></audio>`;
-            break;
-
-            // *** NÂNG CẤP Ở ĐÂY ***
-        case 'pdf':
-            // 1. Thêm class để phóng to modal
-            modalContent.classList.add('modal-content-fullscreen');
-            // 2. Thêm hash parameter để PDF tự động zoom-to-width
-            html = `<iframe src="${d.data}#view=fitH" style="width: 100%; height: 100%; border: none;"></iframe>`;
-            break;
-
-        case 'code':
-            html =
-                `<pre class="line-numbers" style="width:100%;height:100%;margin:0;max-height:calc(90vh - 55px);"><code class="language-${d.language}">${escapeHtml(d.data)}</code></pre>`;
-            break;
-        default:
-            html =
-                `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-file fa-3x" style="margin-bottom: 15px;"></i><p>No preview available for <strong>${escapeHtml(d.data.name)}</strong>.</p><p>Size: ${d.data.size}</p></div>`;
-            break;
-    }
-    content.innerHTML = html;
-
-    if (d.type === 'video' || d.type === 'audio') {
-        G.plyrInstance = new Plyr('#media-player', {
-            autoplay: true
-        });
-    } else if (d.type === 'code') {
-        Prism.highlightAllUnder(content);
-    }
-}
 
 function toggleSelectAll(isChecked) {
     $$('.selectable').forEach(el => {
@@ -2951,21 +3160,43 @@ function toggleSelectAll(isChecked) {
     }
 }
 
+function togglePreviewFullscreen() {
+    const modal = $('#previewModal');
+    const body = document.body;
+    const btnIcon = $('#previewMaximizeBtn i');
+
+    modal.classList.toggle('modal-maximized');
+    body.classList.toggle('preview-maximized');
+
+    if (modal.classList.contains('modal-maximized')) {
+        btnIcon.classList.remove('fa-expand');
+        btnIcon.classList.add('fa-compress');
+        $('#previewMaximizeBtn').title = 'Restore';
+    } else {
+        btnIcon.classList.remove('fa-compress');
+        btnIcon.classList.add('fa-expand');
+        $('#previewMaximizeBtn').title = 'Maximize';
+    }
+}
+
 function escapeJS(str) {
     return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
-const CHUNK_SIZE = 2 * 1024 * 1024,
-    MAX_PARALLEL_UPLOADS = 4,
-    MAX_RETRIES = 3;
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_PARALLEL_UPLOADS = 3;
+const MAX_RETRIES = 3;
+
 let parentIdForUpload = G.currentFolderId;
 
 function openUploadModal() {
     parentIdForUpload = G.currentFolderId;
     openModal('uploadModal');
 }
+
 const dropZone = $('#drop-zone'),
     fileInput = $('#file-input-chunk'),
     progressList = $('#upload-progress-list');
+
 dropZone.addEventListener('dragover', e => {
     e.preventDefault();
     dropZone.classList.add('dragover');
@@ -2995,55 +3226,73 @@ function createProgressItem(file) {
     return item;
 }
 async function uploadFile(file) {
-    const item = createProgressItem(file),
-        bar = item.querySelector('.progress-bar'),
-        status = item.querySelector('.progress-status'),
-        icon = item.querySelector('.status-icon');
+    const item = createProgressItem(file);
+    const bar = item.querySelector('.progress-bar');
+    const status = item.querySelector('.progress-status');
+    const icon = item.querySelector('.status-icon');
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
     status.textContent = 'Preparing...';
-    const startData = {
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        parentId: parentIdForUpload
-    };
-    const startResult = await apiCall('start_upload', startData);
+
+    const startData = new FormData();
+    startData.append('action', 'start_upload');
+    startData.append('fileName', file.name);
+    startData.append('fileSize', file.size);
+    startData.append('mimeType', file.type);
+    startData.append('parentId', parentIdForUpload);
+
+    const startResult = await apiCall('start_upload', startData, 'POST');
+
     if (!startResult.success) {
         status.textContent = 'Error: ' + startResult.message;
         icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
         return;
     }
+
     const fileId = startResult.fileId;
     const chunkQueue = Array.from({
         length: totalChunks
     }, (_, i) => i);
-    let progress = 0;
+    let completedChunks = 0;
+
     const uploadWorker = async () => {
         while (chunkQueue.length > 0) {
             const chunkIndex = chunkQueue.shift();
+            if (chunkIndex === undefined) continue;
+
             let retries = 0;
             while (retries < MAX_RETRIES) {
                 try {
                     const start = chunkIndex * CHUNK_SIZE;
                     const chunk = file.slice(start, start + CHUNK_SIZE);
-                    const chunkResult = await apiCall('upload_chunk', {
-                        fileId: fileId,
-                        chunkIndex: chunkIndex,
-                        chunk: chunk
-                    });
+
+                    const chunkData = new FormData();
+                    chunkData.append('action', 'upload_chunk');
+                    chunkData.append('fileId', fileId);
+                    chunkData.append('chunkIndex', chunkIndex);
+                    chunkData.append('chunk', chunk);
+
+                    const chunkResult = await apiCall('upload_chunk', chunkData, 'POST');
                     if (!chunkResult.success) throw new Error(chunkResult.message);
-                    progress++;
-                    updateProgress(progress, totalChunks, bar, status);
+
+                    completedChunks++;
+                    updateProgress(completedChunks, totalChunks, bar, status);
                     break;
                 } catch (e) {
                     retries++;
-                    if (retries >= MAX_RETRIES) throw new Error(`Chunk ${chunkIndex + 1} failed.`);
+                    if (retries >= MAX_RETRIES) {
+                        // Push failed chunk back to the queue for another worker to try
+                        chunkQueue.push(chunkIndex);
+                        throw new Error(`Chunk ${chunkIndex + 1} failed after ${MAX_RETRIES} retries.`);
+                    }
                     await new Promise(r => setTimeout(r, 1000 * retries));
                 }
             }
         }
     };
+
     const workers = Array(MAX_PARALLEL_UPLOADS).fill(null).map(uploadWorker);
+
     try {
         await Promise.all(workers);
     } catch (e) {
@@ -3051,22 +3300,36 @@ async function uploadFile(file) {
         icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
         return;
     }
+
+    if (completedChunks < totalChunks) {
+        status.textContent = 'Upload failed: Not all chunks were uploaded.';
+        icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
+        return;
+    }
+
     status.textContent = 'Assembling file...';
-    const completeResult = await apiCall('complete_upload', {
-        fileId: fileId,
-        totalChunks: totalChunks
-    });
+
+    const completeData = new FormData();
+    completeData.append('action', 'complete_upload');
+    completeData.append('fileId', fileId);
+    completeData.append('totalChunks', totalChunks);
+
+    const completeResult = await apiCall('complete_upload', completeData, 'POST');
+
     if (completeResult.success) {
         status.textContent = 'Complete!';
         icon.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success-color)"></i>`;
         setTimeout(() => {
-            if ($('#uploadModal').classList.contains('show')) navigateToPath(window.location.search, true);
+            if ($('#uploadModal').classList.contains('show')) {
+                navigateToPath(window.location.search, true);
+            }
         }, 1200);
     } else {
         status.textContent = 'Finalization failed: ' + completeResult.message;
         icon.innerHTML = `<i class="fas fa-exclamation-circle" style="color:var(--danger-color)"></i>`;
     }
 }
+
 
 function updateProgress(chunkNum, totalChunks, bar, status) {
     const percent = totalChunks > 0 ? Math.round((chunkNum / totalChunks) * 100) : 100;
@@ -3081,51 +3344,358 @@ function getFileIconJS(name, isFolder = false) {
             color: '#5ac8fa'
         };
     }
-    const ext = name.split('.').pop().toLowerCase();
-    const map = {
-        pdf: {
+
+    const nameLower = name.toLowerCase();
+    const extension = nameLower.split('.').pop();
+
+    // Mặc định
+    let icon = 'fa-file';
+    let color = '#8a8a8e';
+
+    const iconMap = {
+        // --- Office & Documents ---
+        'pdf': {
             i: 'fa-file-pdf',
             c: '#e62e2e'
         },
-        doc: {
+        'doc': {
             i: 'fa-file-word',
             c: '#2a5699'
         },
-        docx: {
+        'docx': {
             i: 'fa-file-word',
             c: '#2a5699'
         },
-        zip: {
+        'xls': {
+            i: 'fa-file-excel',
+            c: '#217346'
+        },
+        'xlsx': {
+            i: 'fa-file-excel',
+            c: '#217346'
+        },
+        'csv': {
+            i: 'fa-file-excel',
+            c: '#217346'
+        },
+        'ppt': {
+            i: 'fa-file-powerpoint',
+            c: '#d24726'
+        },
+        'pptx': {
+            i: 'fa-file-powerpoint',
+            c: '#d24726'
+        },
+        'txt': {
+            i: 'fa-file-alt',
+            c: '#a0a0a5'
+        },
+        'rtf': {
+            i: 'fa-file-alt',
+            c: '#a0a0a5'
+        },
+
+        // --- Archives ---
+        'zip': {
             i: 'fa-file-archive',
             c: '#f0ad4e'
         },
-        rar: {
+        'rar': {
             i: 'fa-file-archive',
             c: '#f0ad4e'
         },
-        jpg: {
+        '7z': {
+            i: 'fa-file-archive',
+            c: '#f0ad4e'
+        },
+        'tar': {
+            i: 'fa-file-archive',
+            c: '#f0ad4e'
+        },
+        'gz': {
+            i: 'fa-file-archive',
+            c: '#f0ad4e'
+        },
+
+        // --- Images ---
+        'jpg': {
             i: 'fa-file-image',
             c: '#5cb85c'
         },
-        png: {
+        'jpeg': {
             i: 'fa-file-image',
             c: '#5cb85c'
         },
-        mp4: {
-            i: 'fa-file-video',
-            c: '#6c5b7b'
+        'png': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
         },
-        mp3: {
+        'gif': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        'bmp': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        'webp': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        'heic': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        'tiff': {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        'svg': {
+            i: 'fa-file-image',
+            c: '#ffb13b'
+        },
+
+        // --- Design Files ---
+        'psd': {
+            i: 'fa-file-image',
+            c: '#3498db'
+        },
+        'ai': {
+            i: 'fa-file-image',
+            c: '#f39c12'
+        },
+        'fig': {
+            i: 'fa-file-image',
+            c: '#a259ff'
+        },
+
+        // --- Audio ---
+        'mp3': {
             i: 'fa-file-audio',
-            c: '#c06c84'
-        }
+            c: '#9b59b6'
+        },
+        'wav': {
+            i: 'fa-file-audio',
+            c: '#9b59b6'
+        },
+        'aac': {
+            i: 'fa-file-audio',
+            c: '#9b59b6'
+        },
+        'flac': {
+            i: 'fa-file-audio',
+            c: '#9b59b6'
+        },
+        'm4a': {
+            i: 'fa-file-audio',
+            c: '#9b59b6'
+        },
+
+        // --- Video ---
+        'mp4': {
+            i: 'fa-file-video',
+            c: '#e74c3c'
+        },
+        'mov': {
+            i: 'fa-file-video',
+            c: '#e74c3c'
+        },
+        'avi': {
+            i: 'fa-file-video',
+            c: '#e74c3c'
+        },
+        'mkv': {
+            i: 'fa-file-video',
+            c: '#e74c3c'
+        },
+        'webm': {
+            i: 'fa-file-video',
+            c: '#e74c3c'
+        },
+
+        // --- Code & Text-based Files ---
+        'html': {
+            i: 'fa-file-code',
+            c: '#e44d26'
+        },
+        'htm': {
+            i: 'fa-file-code',
+            c: '#e44d26'
+        },
+        'css': {
+            i: 'fa-file-code',
+            c: '#264de4'
+        },
+        'scss': {
+            i: 'fa-file-code',
+            c: '#264de4'
+        },
+        'sass': {
+            i: 'fa-file-code',
+            c: '#264de4'
+        },
+        'js': {
+            i: 'fa-file-code',
+            c: '#f0db4f'
+        },
+        'ts': {
+            i: 'fa-file-code',
+            c: '#f0db4f'
+        },
+        'jsx': {
+            i: 'fa-file-code',
+            c: '#f0db4f'
+        },
+        'tsx': {
+            i: 'fa-file-code',
+            c: '#f0db4f'
+        },
+        'json': {
+            i: 'fa-file-code',
+            c: '#8a8a8e'
+        },
+        'xml': {
+            i: 'fa-file-code',
+            c: '#ff6600'
+        },
+        'md': {
+            i: 'fa-file-alt',
+            c: '#34495e'
+        },
+        'php': {
+            i: 'fa-file-code',
+            c: '#8892be'
+        },
+        'py': {
+            i: 'fa-file-code',
+            c: '#3572A5'
+        },
+        'java': {
+            i: 'fa-file-code',
+            c: '#b07219'
+        },
+        'jar': {
+            i: 'fa-file-code',
+            c: '#b07219'
+        },
+        'c': {
+            i: 'fa-file-code',
+            c: '#00599c'
+        },
+        'cpp': {
+            i: 'fa-file-code',
+            c: '#00599c'
+        },
+        'h': {
+            i: 'fa-file-code',
+            c: '#00599c'
+        },
+        'cs': {
+            i: 'fa-file-code',
+            c: '#68217a'
+        },
+        'sql': {
+            i: 'fa-database',
+            c: '#f29111'
+        },
+        'sh': {
+            i: 'fa-terminal',
+            c: '#4EAA25'
+        },
+        'bash': {
+            i: 'fa-terminal',
+            c: '#4EAA25'
+        },
+        'yml': {
+            i: 'fa-file-code',
+            c: '#cb171e'
+        },
+        'yaml': {
+            i: 'fa-file-code',
+            c: '#cb171e'
+        },
+        'rb': {
+            i: 'fa-file-code',
+            c: '#CC342D'
+        },
+        'go': {
+            i: 'fa-file-code',
+            c: '#00ADD8'
+        },
+        'swift': {
+            i: 'fa-file-code',
+            c: '#F05138'
+        },
+        'kt': {
+            i: 'fa-file-code',
+            c: '#7F52FF'
+        },
+        'rs': {
+            i: 'fa-file-code',
+            c: '#000000'
+        },
+        'dockerfile': {
+            i: 'fa-file-code',
+            c: '#384d54'
+        },
+
+        // --- Fonts ---
+        'ttf': {
+            i: 'fa-font',
+            c: '#94a2b0'
+        },
+        'otf': {
+            i: 'fa-font',
+            c: '#94a2b0'
+        },
+        'woff': {
+            i: 'fa-font',
+            c: '#94a2b0'
+        },
+        'woff2': {
+            i: 'fa-font',
+            c: '#94a2b0'
+        },
+
+        // --- Executables & System ---
+        'exe': {
+            i: 'fa-cog',
+            c: '#34495e'
+        },
+        'app': {
+            i: 'fa-cog',
+            c: '#34495e'
+        },
+        'dmg': {
+            i: 'fa-cog',
+            c: '#34495e'
+        },
+        'iso': {
+            i: 'fa-compact-disc',
+            c: '#7f8c8d'
+        },
+        'apk': {
+            i: 'fa-robot',
+            c: '#a4c639'
+        },
     };
-    return map[ext] ? {
-        icon: map[ext].i,
-        color: map[ext].c
-    } : {
-        icon: 'fa-file',
-        color: '#8a8a8e'
+
+    if (iconMap[extension]) {
+        icon = iconMap[extension].i;
+        color = iconMap[extension].c;
+    }
+
+    // Xử lý các file không có phần mở rộng
+    if (nameLower.indexOf('.') === -1) {
+        if (nameLower === 'dockerfile') {
+            icon = 'fa-file-code';
+            color = '#384d54';
+        }
+    }
+
+    return {
+        icon,
+        color
     };
 }
 
@@ -3150,7 +3720,9 @@ function formatBytesJS(bytes, decimals = 2) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const sessionMessage = <?php echo !empty($session_message) ? $session_message : 'null'; ?>;
+    const sessionMessage = <?php echo !empty($session_message)
+        ? $session_message
+        : "null"; ?>;
     if (sessionMessage) {
         showToast(sessionMessage.text, sessionMessage.type);
     }
@@ -3246,10 +3818,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 navigateToPath(link.search);
             }
         } else if (item.dataset.type === 'file') {
-            openPreviewModal(item.dataset.name, item.dataset.id);
+            openPreviewModal(item.dataset.id, item.dataset.name);
         }
     });
     mainContentArea.addEventListener('contextmenu', e => {
+        // THÊM LOGIC MỚI: Nếu có bất kỳ modal nào đang hiển thị, không làm gì cả.
+        if (document.querySelector('.modal.show')) {
+            return;
+        }
+
+        // Giữ nguyên logic cũ
         const item = e.target.closest('.selectable');
         if (item) {
             e.preventDefault();
@@ -3272,7 +3850,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     searchInput.addEventListener('blur', hideLiveSearch);
 
-    // Tìm đến listener này trong DOMContentLoaded
     window.addEventListener('click', e => {
         if (e.target.classList.contains('modal')) closeModal(e.target.id);
 
@@ -3280,13 +3857,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (popover.classList.contains('show') && !e.target.closest('.action-popover') && !e.target
             .closest('.action-btn')) {
             popover.classList.remove('show');
-
-            // --- GIẢI PHÁP MỚI: Kích hoạt lại con trỏ trên iframe ---
-            const iframe = $('#previewContent iframe');
-            if (iframe) {
-                iframe.style.pointerEvents = 'auto';
-            }
-            // --- KẾT THÚC PHẦN THAY ĐỔI ---
         }
     });
     $$('.tab-nav-item').forEach(tab => {

@@ -1,5 +1,5 @@
 <?php
 
 return array (
-  'admin' => '$2y$10$2N9OXnaUpOOVkXrvyPUf3eAbCL90/S6UYaQKd21IyGbW4AK5bOOYa',
+  'admin' => '$2a$12$RIUD80yRYDJanSoRF54VeeHvAelKypWT8Z3PkwMqk3df1gKBcRSB2',
 );

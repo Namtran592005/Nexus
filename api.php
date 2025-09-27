@@ -45,11 +45,6 @@ function buildFolderTree($pdo, $parentId, $excludeIds = [])
 
 try {
     switch ($action) {
-        // --- CÁC ACTION CŨ VẪN GIỮ NGUYÊN ---
-        // (new_folder, rename, delete, restore, ..., create_share_link)
-
-        // --- ACTION MỚI: LẤY DỮ LIỆU CHO CÁC VIEW ---
-        // THAY THẾ TOÀN BỘ CASE 'get_view_data' BẰNG PHIÊN BẢN NÀY
         case "get_folder_tree":
             $excludeIds = isset($input["exclude_ids"])
                 ? (array) $input["exclude_ids"]
@@ -178,7 +173,6 @@ try {
             break;
 
         case "new_folder":
-            // ... code giữ nguyên ...
             $folderName = trim($input["folder_name"] ?? "");
             $parentId = (int) ($input["parent_id"] ?? ROOT_FOLDER_ID);
             $folderName = preg_replace("/[^\p{L}\p{N} _.-]/u", "", $folderName);
@@ -213,8 +207,8 @@ try {
                 "item" => $newItem,
             ];
             break;
+
         case "rename":
-            // ... code giữ nguyên ...
             $id = (int) ($input["id"] ?? 0);
             $newNameFromForm = trim($input["new_name"] ?? "");
             $stmt = $pdo->prepare(
@@ -266,8 +260,8 @@ try {
                 "newName" => $finalNewName,
             ];
             break;
+
         case "delete":
-            // ... code giữ nguyên ...
             $ids = (array) ($input["ids"] ?? []);
             $forceDelete = ($input["force_delete"] ?? "false") === "true";
             if (empty($ids)) {
@@ -289,8 +283,8 @@ try {
             }
             $response = ["success" => true, "message" => $message];
             break;
+
         case "restore":
-            // ... code giữ nguyên ...
             $ids = (array) ($input["ids"] ?? []);
             if (empty($ids)) {
                 throw new Exception("No items to restore.");
@@ -331,17 +325,16 @@ try {
                 "message" => count($ids) . " item(s) restored.",
             ];
             break;
+
         case "empty_trash":
-            // ... code giữ nguyên ...
             $stmt = $pdo->query("DELETE FROM file_system WHERE is_deleted = 1");
             $response = [
                 "success" => true,
                 "message" => "Trash has been emptied.",
             ];
             break;
-        // --- NÂNG CẤP ACTION 'move' ---
+
         case "move":
-            // Chấp nhận một mảng các itemIds
             $itemIds = (array) ($input["item_ids"] ?? []);
             $destinationId = (int) ($input["destination_id"] ?? 0);
 
@@ -364,16 +357,15 @@ try {
                 $item = $stmt->fetch();
                 if (!$item) {
                     continue;
-                } // Bỏ qua nếu không tìm thấy
+                }
 
                 if ($itemId === $destinationId) {
                     throw new Exception("Cannot move an item into itself.");
                 }
                 if ($item["parent_id"] === $destinationId) {
                     continue;
-                } // Bỏ qua nếu đã ở đúng vị trí
+                }
 
-                // Kiểm tra di chuyển thư mục vào thư mục con của nó
                 if ($item["type"] === "folder") {
                     $currentParent = $destinationId;
                     while (
@@ -393,14 +385,11 @@ try {
                     }
                 }
 
-                // Kiểm tra tên trùng lặp
                 $stmt = $pdo->prepare(
                     "SELECT id FROM file_system WHERE name = ? AND parent_id = ? AND is_deleted = 0"
                 );
                 $stmt->execute([$item["name"], $destinationId]);
                 if ($stmt->fetch()) {
-                    // Nếu có thể, bạn có thể thêm logic đổi tên tự động ở đây
-                    // ví dụ: 'file_copy.txt'
                     throw new Exception(
                         'An item named "' .
                             htmlspecialchars($item["name"]) .
@@ -421,63 +410,8 @@ try {
                 "message" => count($itemIds) . " item(s) moved successfully.",
             ];
             break;
-            // ... code giữ nguyên ...
-            $itemId = (int) ($input["item_id"] ?? 0);
-            $destinationId = (int) ($input["destination_id"] ?? 0);
-            $stmt = $pdo->prepare(
-                "SELECT name, type, parent_id FROM file_system WHERE id = ?"
-            );
-            $stmt->execute([$itemId]);
-            $item = $stmt->fetch();
-            if (!$item) {
-                throw new Exception("Source item not found.");
-            }
-            if ($itemId === $destinationId) {
-                throw new Exception("Cannot move an item into itself.");
-            }
-            if ($item["parent_id"] === $destinationId) {
-                throw new Exception("Item is already in this folder.");
-            }
-            if ($item["type"] === "folder") {
-                $currentParent = $destinationId;
-                while (
-                    $currentParent != ROOT_FOLDER_ID &&
-                    $currentParent != null
-                ) {
-                    if ($currentParent == $itemId) {
-                        throw new Exception(
-                            "Cannot move a folder into its own subfolder."
-                        );
-                    }
-                    $stmt = $pdo->prepare(
-                        "SELECT parent_id FROM file_system WHERE id = ?"
-                    );
-                    $stmt->execute([$currentParent]);
-                    $currentParent = $stmt->fetchColumn();
-                }
-            }
-            $stmt = $pdo->prepare(
-                "SELECT id FROM file_system WHERE name = ? AND parent_id = ? AND is_deleted = 0"
-            );
-            $stmt->execute([$item["name"], $destinationId]);
-            if ($stmt->fetch()) {
-                throw new Exception(
-                    'An item named "' .
-                        htmlspecialchars($item["name"]) .
-                        '" already exists.'
-                );
-            }
-            $stmt = $pdo->prepare(
-                "UPDATE file_system SET parent_id = ? WHERE id = ?"
-            );
-            $stmt->execute([$destinationId, $itemId]);
-            $response = [
-                "success" => true,
-                "message" => "Item moved successfully.",
-            ];
-            break;
+
         case "live_search":
-            // ... code giữ nguyên ...
             $searchTerm = $input["q"] ?? "";
             $items = [];
             if (strlen($searchTerm) >= 2) {
@@ -496,8 +430,8 @@ try {
             }
             $response = ["success" => true, "items" => $items];
             break;
+
         case "get_details":
-            // ... code giữ nguyên ...
             $id = (int) ($input["id"] ?? 0);
             $stmt = $pdo->prepare(
                 "SELECT id, name, type, size, mime_type, created_at, modified_at FROM file_system WHERE id = ?"
@@ -539,8 +473,8 @@ try {
             }
             $response = ["success" => true, "item" => $item];
             break;
+
         case "start_upload":
-            // ... code giữ nguyên ...
             define("TEMP_UPLOAD_DIR", __DIR__ . "/temp_uploads");
             if (!is_dir(TEMP_UPLOAD_DIR)) {
                 if (!mkdir(TEMP_UPLOAD_DIR, 0777, true)) {
@@ -573,8 +507,8 @@ try {
             $pdo->commit();
             $response = ["success" => true, "fileId" => $fileId];
             break;
+
         case "upload_chunk":
-            // ... code giữ nguyên ...
             define("TEMP_UPLOAD_DIR", __DIR__ . "/temp_uploads");
             $fileId = (int) ($_POST["fileId"] ?? 0);
             $chunkIndex = (int) ($_POST["chunkIndex"] ?? -1);
@@ -601,8 +535,8 @@ try {
                 "message" => "Chunk {$chunkIndex} stored.",
             ];
             break;
+
         case "complete_upload":
-            // ... code giữ nguyên ...
             define("TEMP_UPLOAD_DIR", __DIR__ . "/temp_uploads");
             set_time_limit(600);
             $fileId = (int) ($_POST["fileId"] ?? 0);
@@ -643,8 +577,8 @@ try {
                 "message" => "File assembled successfully.",
             ];
             break;
+
         case "get_preview_data":
-            // ... code giữ nguyên ...
             $id = (int) ($input["id"] ?? 0);
             $stmt = $pdo->prepare(
                 "SELECT id, name, type, mime_type, size, modified_at, content FROM file_system WHERE id = ? AND type = 'file' AND is_deleted = 0"
@@ -654,47 +588,61 @@ try {
             if (!$file) {
                 throw new Exception("File not found or cannot be accessed.");
             }
+
             $mimeType = $file["mime_type"] ?: "application/octet-stream";
             $fileUrl =
-                BASE_URL .
-                "api.php?action=download_file&id=" .
-                $file["id"] .
-                "&inline=true";
-            if (isImage($mimeType)) {
+                BASE_URL . "api.php?action=download_file&id=" . $file["id"];
+
+            $clientRenderMimeTypes = [
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+            ];
+
+            if ($mimeType === "application/pdf") {
+                $response = [
+                    "success" => true,
+                    "type" => "pdf_viewer",
+                    "data" => $fileUrl . "&inline=true",
+                ];
+            } elseif (in_array($mimeType, $clientRenderMimeTypes)) {
+                $response = [
+                    "success" => true,
+                    "type" => "client_office_viewer",
+                    "data" => [
+                        "fileUrl" => $fileUrl,
+                        "mimeType" => $mimeType,
+                    ],
+                ];
+            } elseif (isImage($mimeType)) {
                 $response = [
                     "success" => true,
                     "type" => "image",
-                    "data" => $fileUrl,
+                    "data" => $fileUrl . "&inline=true",
                     "mime_type" => $mimeType,
                 ];
             } elseif (isVideo($mimeType)) {
                 $response = [
                     "success" => true,
                     "type" => "video",
-                    "data" => $fileUrl,
+                    "data" => $fileUrl . "&inline=true",
                     "mime_type" => $mimeType,
                 ];
             } elseif (isAudio($mimeType)) {
                 $response = [
                     "success" => true,
                     "type" => "audio",
-                    "data" => $fileUrl,
-                    "mime_type" => $mimeType,
-                ];
-            } elseif (isPdf($mimeType)) {
-                $response = [
-                    "success" => true,
-                    "type" => "pdf",
-                    "data" => $fileUrl,
+                    "data" => $fileUrl . "&inline=true",
                     "mime_type" => $mimeType,
                 ];
             } elseif (
-                isTextOrCode($mimeType) &&
-                $file["size"] < 2 * 1024 * 1024
+                isEditableAsCode($file["name"], $mimeType) &&
+                $file["size"] < 5 * 1024 * 1024
             ) {
+                // Giới hạn 5MB
                 $response = [
                     "success" => true,
-                    "type" => "code",
+                    "type" => "code_editor",
                     "data" => $file["content"],
                     "mime_type" => $mimeType,
                     "language" => guessCodeLanguage($file["name"]),
@@ -711,6 +659,37 @@ try {
                 ];
             }
             break;
+
+        case "save_file_content":
+            $fileId = (int) ($input["file_id"] ?? 0);
+            $newContent = $input["content"] ?? "";
+
+            if ($fileId <= 0) {
+                throw new Exception("Invalid file ID.");
+            }
+
+            $stmt = $pdo->prepare(
+                "SELECT id FROM file_system WHERE id = ? AND type = 'file'"
+            );
+            $stmt->execute([$fileId]);
+            if (!$stmt->fetch()) {
+                throw new Exception("File not found or it's a folder.");
+            }
+
+            $newSize = strlen($newContent);
+
+            $stmt = $pdo->prepare(
+                "UPDATE file_system SET content = ?, size = ? WHERE id = ?"
+            );
+            $stmt->execute([$newContent, $newSize, $fileId]);
+
+            $response = [
+                "success" => true,
+                "message" => "File saved successfully.",
+                "new_size_formatted" => formatBytes($newSize),
+            ];
+            break;
+
         case "get_share_details":
             $file_id = (int) ($input["file_id"] ?? 0);
             if ($file_id <= 0) {
@@ -723,7 +702,6 @@ try {
             $stmt->execute([$file_id]);
             $details = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Không trả về hash mật khẩu, chỉ cần cho biết nó có tồn tại hay không
             if ($details) {
                 $details["has_password"] = !empty($details["password"]);
                 unset($details["password"]);
@@ -749,7 +727,6 @@ try {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             }
 
-            // Kiểm tra link đã tồn tại chưa
             $stmt = $pdo->prepare(
                 "SELECT id FROM share_links WHERE file_id = ?"
             );
@@ -757,7 +734,6 @@ try {
             $existing_link = $stmt->fetch();
 
             if ($existing_link) {
-                // Cập nhật link hiện có
                 $shareId = $existing_link["id"];
                 $stmt = $pdo->prepare(
                     "UPDATE share_links SET password = ?, expires_at = ?, allow_download = ? WHERE file_id = ?"
@@ -769,7 +745,6 @@ try {
                     $file_id,
                 ]);
             } else {
-                // Tạo link mới
                 $shareId = bin2hex(random_bytes(8));
                 $stmt = $pdo->prepare(
                     "INSERT INTO share_links (id, file_id, password, expires_at, allow_download) VALUES (?, ?, ?, ?, ?)"
@@ -790,47 +765,34 @@ try {
             break;
 
         case "remove_share_link":
-            $file_id = (int) ($input["file_id"] ?? 0);
-            if ($file_id <= 0) {
-                throw new Exception("Invalid file ID.");
-            }
-
-            $stmt = $pdo->prepare("DELETE FROM share_links WHERE file_id = ?");
-            $stmt->execute([$file_id]);
-
-            $response = ["success" => true, "message" => "Share link removed."];
-            break;
-            // ... code giữ nguyên ...
-            $file_id = (int) ($input["file_id"] ?? 0);
-            if ($file_id <= 0) {
-                throw new Exception("Invalid file ID.");
-            }
-            $stmt = $pdo->prepare(
-                "SELECT id FROM share_links WHERE file_id = ?"
-            );
-            $stmt->execute([$file_id]);
-            if ($existing = $stmt->fetch()) {
-                $response = ["success" => true, "share_id" => $existing["id"]];
-            } else {
-                $shareId = bin2hex(random_bytes(8));
-                $stmt = $pdo->prepare(
-                    "INSERT INTO share_links (id, file_id) VALUES (?, ?)"
+            $file_ids = (array) ($input["file_ids"] ?? []);
+            if (empty($file_ids)) {
+                throw new Exception(
+                    "No file IDs provided to remove share links."
                 );
-                $stmt->execute([$shareId, $file_id]);
-                $response = ["success" => true, "share_id" => $shareId];
             }
+
+            $file_ids = array_map("intval", $file_ids);
+
+            $placeholders = rtrim(str_repeat("?,", count($file_ids)), ",");
+            $stmt = $pdo->prepare(
+                "DELETE FROM share_links WHERE file_id IN ($placeholders)"
+            );
+            $stmt->execute($file_ids);
+
+            $response = [
+                "success" => true,
+                "message" => count($file_ids) . " share link(s) removed.",
+            ];
             break;
 
-        // --- NÂNG CẤP ACTION: TẢI FILE (từ download.php) VỚI STREAMING ---
         case "download_file":
-            // Tắt bộ đệm đầu ra của PHP và Gzip để kiểm soát hoàn toàn việc gửi dữ liệu
             if (ob_get_level()) {
                 ob_end_clean();
             }
 
             $id = (int) ($_GET["id"] ?? 0);
 
-            // Chỉ lấy metadata trước
             $meta_stmt = $pdo->prepare(
                 "SELECT name, mime_type, size FROM file_system WHERE id = ? AND is_deleted = 0 AND type = 'file'"
             );
@@ -842,7 +804,6 @@ try {
                 die("File not found or inaccessible.");
             }
 
-            // Gửi các header cần thiết cho trình duyệt
             header("Content-Description: File Transfer");
             if (isset($_GET["inline"]) && $_GET["inline"] === "true") {
                 header(
@@ -866,10 +827,8 @@ try {
             header("Cache-Control: must-revalidate");
             header("Pragma: public");
 
-            // Đảm bảo tất cả header đã được gửi đi
             flush();
 
-            // Bây giờ, chuẩn bị để stream nội dung BLOB
             $pdo->beginTransaction();
             $stream_stmt = $pdo->prepare(
                 "SELECT content FROM file_system WHERE id = ?"
@@ -877,23 +836,20 @@ try {
             $stream_stmt->bindValue(1, $id, PDO::PARAM_INT);
             $stream_stmt->execute();
 
-            // Liên kết cột 'content' với một biến stream
             $stream_stmt->bindColumn("content", $stream, PDO::PARAM_LOB);
             $stream_stmt->fetch(PDO::FETCH_BOUND);
 
             if ($stream) {
-                // Đọc và gửi stream theo từng đoạn 8KB
                 while (!feof($stream)) {
                     echo fread($stream, 8192);
-                    flush(); // Gửi ngay đoạn vừa đọc đến trình duyệt
+                    flush();
                 }
                 fclose($stream);
             }
 
             $pdo->commit();
-            exit(); // Kết thúc script
+            exit();
 
-        // --- ACTION MỚI: TẢI ARCHIVE (từ create_archive.php) ---
         case "download_archive":
             $itemIds = array_map("intval", $_POST["ids"] ?? []);
             if (empty($itemIds)) {
@@ -917,7 +873,6 @@ try {
                 die("Could not open archive");
             }
 
-            // Hàm đệ quy để thêm thư mục vào zip (cần định nghĩa lại trong scope này)
             function addFolderToZip($pdo, $folderId, $zip, $parentPath)
             {
                 $stmt = $pdo->prepare(
@@ -993,23 +948,20 @@ try {
             readfile($zipFilePath);
 
             unlink($zipFilePath);
-            exit(); // Quan trọng
+            exit();
     }
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    // Chỉ set http code và response nếu không phải là action download
     if (!$isDownloadAction) {
         http_response_code(400);
         $response = ["success" => false, "message" => $e->getMessage()];
     } else {
-        // Với action download, chỉ cần die với thông báo lỗi
         die("Error: " . $e->getMessage());
     }
 }
 
-// Chỉ echo JSON nếu không phải action download
 if (!$isDownloadAction) {
     echo json_encode($response);
 }

@@ -144,12 +144,17 @@ function formatBytes($bytes, $precision = 2)
 function getFileIcon($fileName, $isFolder = false)
 {
     if ($isFolder) {
-        return ["icon" => "fa-folder", "color" => "#5aa4f0"];
+        return ["icon" => "fa-folder", "color" => "#5ac8fa"]; // Giữ nguyên màu xanh cho thư mục
     }
+
     $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    $color = "#8a8a8e";
+
+    // Mặc định cho các file không xác định
     $icon = "fa-file";
+    $color = "#8a8a8e";
+
     switch ($extension) {
+        // --- Office & Documents ---
         case "pdf":
             $icon = "fa-file-pdf";
             $color = "#e62e2e";
@@ -161,6 +166,7 @@ function getFileIcon($fileName, $isFolder = false)
             break;
         case "xls":
         case "xlsx":
+        case "csv":
             $icon = "fa-file-excel";
             $color = "#217346";
             break;
@@ -169,57 +175,205 @@ function getFileIcon($fileName, $isFolder = false)
             $icon = "fa-file-powerpoint";
             $color = "#d24726";
             break;
+        case "txt":
+        case "rtf":
+            $icon = "fa-file-alt";
+            $color = "#a0a0a5";
+            break;
+
+        // --- Archives ---
+        case "zip":
+        case "rar":
+        case "7z":
+        case "tar":
+        case "gz":
+            $icon = "fa-file-archive";
+            $color = "#f0ad4e";
+            break;
+
+        // --- Images ---
         case "jpg":
         case "jpeg":
         case "png":
         case "gif":
         case "bmp":
+        case "webp":
         case "heic":
+        case "tiff":
             $icon = "fa-file-image";
             $color = "#5cb85c";
             break;
-        case "zip":
-        case "rar":
-        case "7z":
-            $icon = "fa-file-archive";
-            $color = "#f0ad4e";
+        case "svg":
+            $icon = "fa-file-image";
+            $color = "#ffb13b";
+            break; // Màu khác cho vector
+
+        // --- Design Files ---
+        case "psd": // Photoshop
+            $icon = "fa-file-image";
+            $color = "#3498db";
             break;
-        case "txt":
-        case "log":
-        case "md":
-            $icon = "fa-file-alt";
-            $color = "#a0a0a5";
+        case "ai": // Illustrator
+            $icon = "fa-file-image";
+            $color = "#f39c12";
             break;
+        case "fig": // Figma
+            $icon = "fa-file-image";
+            $color = "#a259ff";
+            break;
+
+        // --- Audio ---
         case "mp3":
         case "wav":
         case "aac":
+        case "flac":
+        case "m4a":
             $icon = "fa-file-audio";
-            $color = "#c06c84";
+            $color = "#9b59b6";
             break;
+
+        // --- Video ---
         case "mp4":
         case "mov":
         case "avi":
+        case "mkv":
+        case "webm":
             $icon = "fa-file-video";
-            $color = "#6c5b7b";
+            $color = "#e74c3c";
             break;
+
+        // --- Code & Text-based Files ---
         case "html":
-        case "css":
-        case "js":
-        case "php":
-        case "py":
-        case "java":
-        case "c":
-        case "cpp":
-        case "json":
-        case "xml":
+        case "htm":
             $icon = "fa-file-code";
-            $color = "#8d6e63";
+            $color = "#e44d26";
             break;
-        default:
-            $icon = "fa-file";
+        case "css":
+        case "scss":
+        case "sass":
+            $icon = "fa-file-code";
+            $color = "#264de4";
+            break;
+        case "js":
+        case "ts":
+        case "jsx":
+        case "tsx":
+            $icon = "fa-file-code";
+            $color = "#f0db4f";
+            break;
+        case "json":
+            $icon = "fa-file-code";
             $color = "#8a8a8e";
             break;
+        case "xml":
+            $icon = "fa-file-code";
+            $color = "#ff6600";
+            break;
+        case "md":
+            $icon = "fa-file-alt";
+            $color = "#34495e";
+            break; // Markdown dùng icon text
+        case "php":
+            $icon = "fa-file-code";
+            $color = "#8892be";
+            break;
+        case "py":
+            $icon = "fa-file-code";
+            $color = "#3572A5";
+            break;
+        case "java":
+        case "jar":
+            $icon = "fa-file-code";
+            $color = "#b07219";
+            break;
+        case "c":
+        case "cpp":
+        case "h":
+            $icon = "fa-file-code";
+            $color = "#00599c";
+            break;
+        case "cs":
+            $icon = "fa-file-code";
+            $color = "#68217a";
+            break;
+        case "sql":
+            $icon = "fa-database";
+            $color = "#f29111";
+            break; // Dùng icon database cho SQL
+        case "sh":
+        case "bash":
+            $icon = "fa-terminal";
+            $color = "#4EAA25";
+            break; // Dùng icon terminal
+        case "yml":
+        case "yaml":
+            $icon = "fa-file-code";
+            $color = "#cb171e";
+            break;
+        case "rb":
+            $icon = "fa-file-code";
+            $color = "#CC342D";
+            break;
+        case "go":
+            $icon = "fa-file-code";
+            $color = "#00ADD8";
+            break;
+        case "swift":
+            $icon = "fa-file-code";
+            $color = "#F05138";
+            break;
+        case "kt":
+            $icon = "fa-file-code";
+            $color = "#7F52FF";
+            break;
+        case "rs":
+            $icon = "fa-file-code";
+            $color = "#000000";
+            break;
+        case "dockerfile":
+            $icon = "fa-file-code";
+            $color = "#384d54";
+            break;
+
+        // --- Fonts ---
+        case "ttf":
+        case "otf":
+        case "woff":
+        case "woff2":
+            $icon = "fa-font";
+            $color = "#94a2b0";
+            break;
+
+        // --- Executables & System ---
+        case "exe":
+        case "app":
+        case "dmg":
+            $icon = "fa-cog";
+            $color = "#34495e";
+            break;
+        case "iso":
+            $icon = "fa-compact-disc";
+            $color = "#7f8c8d";
+            break;
+        case "apk":
+            $icon = "fa-robot";
+            $color = "#a4c639";
+            break; // Icon Android
+
+        default:
+            // Giữ nguyên giá trị mặc định đã khai báo ở trên
+            break;
     }
+
+    // Xử lý các file không có phần mở rộng
+    $name = strtolower(basename($fileName));
+    if (strpos($name, ".") === false) {
+        if ($name === "dockerfile") {
+            $icon = "fa-file-code";
+            $color = "#384d54";
+        }
+    }
+
     return ["icon" => $icon, "color" => $color];
 }
 
@@ -241,43 +395,144 @@ function isPdf($mimeType)
 }
 function isTextOrCode($mimeType)
 {
-    return str_starts_with($mimeType, "text/") ||
-        in_array($mimeType, [
-            "application/json",
-            "application/xml",
-            "application/javascript",
-        ]);
+    if (str_starts_with($mimeType, "text/")) {
+        return true;
+    }
+
+    $code_mimes = [
+        "application/json",
+        "application/xml",
+        "application/javascript",
+        "application/x-javascript",
+        "application/x-php",
+        "application/x-python",
+        "application/x-ruby",
+        "application/x-sql",
+        "application/x-sh",
+        "application/x-csh",
+        "application/x-httpd-php",
+        // Thêm các MIME type khác nếu cần
+    ];
+
+    return in_array($mimeType, $code_mimes);
+}
+
+// *** HÀM MỚI ĐƯỢC THÊM VÀO ĐÂY ***
+function isOfficeDoc($mimeType)
+{
+    return in_array($mimeType, [
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+    ]);
 }
 
 function guessCodeLanguage($fileName)
 {
-    $extension = pathinfo($fileName, PATHINFO_EXTENSION);
-    switch (strtolower($extension)) {
-        case "php":
-            return "php";
+    // Trả về chuỗi khớp với tên mode của ACE Editor (ví dụ: 'javascript' cho 'ace/mode/javascript')
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+    // Xử lý các trường hợp tên file không có phần mở rộng nhưng vẫn là code (ví dụ: 'Dockerfile')
+    $name = strtolower(basename($fileName));
+    if ($name === "dockerfile") {
+        return "dockerfile";
+    }
+    // Handle dotfiles like .gitignore, .env
+    if (empty($extension) && str_starts_with($name, ".")) {
+        if ($name === ".gitignore") {
+            return "gitignore";
+        }
+        if (str_contains($name, "env")) {
+            return "ini";
+        } // Treat .env like an ini file
+        return "text";
+    }
+
+    switch ($extension) {
+        // Web Frontend
         case "js":
             return "javascript";
+        case "ts":
+            return "typescript";
         case "css":
             return "css";
+        case "scss":
+        case "sass":
+            return "scss";
         case "html":
         case "htm":
+            return "html";
+        case "xml":
             return "xml";
         case "json":
             return "json";
-        case "xml":
-            return "xml";
-        case "py":
-            return "python";
-        case "java":
-            return "java";
-        case "c":
-            return "c";
-        case "cpp":
-            return "cpp";
         case "md":
             return "markdown";
+
+        // Web Backend & General Purpose
+        case "php":
+            return "php";
+        case "py":
+            return "python";
+        case "rb":
+            return "ruby";
+        case "go":
+            return "golang";
+        case "java":
+            return "java";
+        case "cs":
+            return "csharp";
+        case "rs":
+            return "rust";
+
+        // Mobile
+        case "swift":
+            return "swift";
+        case "kt":
+        case "kts":
+            return "kotlin";
+
+        // Scripting & Shell
+        case "sh":
+        case "bash":
+            return "sh";
+        case "ps1":
+            return "powershell";
+
+        // Database
+        case "sql":
+            return "sql";
+
+        // Config & Data
+        case "yml":
+        case "yaml":
+            return "yaml";
+        case "ini":
+        case "cfg":
+        case "conf":
+            return "ini";
+        case "env":
+            return "ini"; // Treat .env as ini for highlighting
+
+        // Low-level
+        case "c":
+        case "h":
+            return "c_cpp";
+        case "cpp":
+        case "hpp":
+        case "cxx":
+            return "c_cpp";
+
+        // Plain Text
+        case "txt":
+        case "log":
+            return "text";
+
         default:
-            return "plaintext";
+            return "text"; // Mặc định là văn bản thuần túy
     }
 }
 
@@ -351,6 +606,91 @@ function getItemIdByPath($pdo, $path)
         }
     }
     return $itemId;
+}
+
+function isEditableAsCode($fileName, $mimeType)
+{
+    // Ưu tiên 1: Kiểm tra các MIME type văn bản rõ ràng.
+    if (
+        str_starts_with($mimeType, "text/") ||
+        in_array($mimeType, [
+            "application/json",
+            "application/xml",
+            "application/javascript",
+            "application/x-php",
+        ])
+    ) {
+        return true;
+    }
+
+    // Ưu tiên 2 (quan trọng nhất): Kiểm tra phần mở rộng của tệp.
+    $editableExtensions = [
+        // Web Frontend
+        "js",
+        "ts",
+        "css",
+        "scss",
+        "sass",
+        "html",
+        "htm",
+        "xml",
+        "json",
+        "md",
+        // Web Backend & General Purpose
+        "php",
+        "py",
+        "rb",
+        "go",
+        "java",
+        "cs",
+        "rs",
+        // Mobile
+        "swift",
+        "kt",
+        "kts",
+        // Scripting & Shell
+        "sh",
+        "bash",
+        "ps1",
+        // Database
+        "sql",
+        // Config & Data
+        "yml",
+        "yaml",
+        "ini",
+        "cfg",
+        "conf",
+        "env",
+        // Low-level
+        "c",
+        "h",
+        "cpp",
+        "hpp",
+        "cxx",
+        // Plain Text
+        "txt",
+        "log",
+    ];
+
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+    // Xử lý các file không có phần mở rộng nhưng vẫn là code (ví dụ: 'Dockerfile', '.gitignore')
+    $name = strtolower(basename($fileName));
+    if (in_array($name, ["dockerfile", ".gitignore"])) {
+        return true;
+    }
+
+    // Nếu Mime Type là binary thì chắc chắn không phải code
+    if (
+        str_starts_with($mimeType, "image/") ||
+        str_starts_with($mimeType, "video/") ||
+        str_starts_with($mimeType, "audio/") ||
+        $mimeType === "application/pdf"
+    ) {
+        return false;
+    }
+
+    return in_array($extension, $editableExtensions);
 }
 
 function getPathByItemId($pdo, $id)

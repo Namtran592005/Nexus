@@ -1,44 +1,57 @@
 <?php
-define('IS_PUBLIC_PAGE', true); // Prevents auth check in bootstrap.php
-require_once 'bootstrap.php';
+define("IS_PUBLIC_PAGE", true); // Prevents auth check in bootstrap.php
+require_once "bootstrap.php";
 
 if (AUTH_ENABLED === false) {
-    redirect_with_message('index.php', 'Xác thực đang tắt, không thể đăng ký.', 'error');
+    redirect_with_message(
+        "index.php",
+        "Xác thực đang tắt, không thể đăng ký.",
+        "error"
+    );
 }
 if (ALLOW_REGISTRATION !== true) {
-    redirect_with_message('login.php', 'Tính năng đăng ký hiện đang bị tắt.', 'error');
+    redirect_with_message(
+        "login.php",
+        "Tính năng đăng ký hiện đang bị tắt.",
+        "error"
+    );
 }
 
-$error_message = '';
-$success_message = '';
+$error_message = "";
+$success_message = "";
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $password_confirm = $_POST['password_confirm'] ?? '';
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $username = trim($_POST["username"] ?? "");
+    $password = $_POST["password"] ?? "";
+    $password_confirm = $_POST["password_confirm"] ?? "";
 
     $users = AUTH_USERS;
 
     if (empty($username) || empty($password)) {
-        $error_message = 'Tên đăng nhập và mật khẩu không được để trống.';
+        $error_message = "Tên đăng nhập và mật khẩu không được để trống.";
     } elseif (strlen($username) < 3) {
-        $error_message = 'Tên đăng nhập phải có ít nhất 3 ký tự.';
-    } elseif (preg_match('/[^A-Za-z0-9_]/', $username)) {
-        $error_message = 'Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới (_).';
+        $error_message = "Tên đăng nhập phải có ít nhất 3 ký tự.";
+    } elseif (preg_match("/[^A-Za-z0-9_]/", $username)) {
+        $error_message =
+            "Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới (_).";
     } elseif (strlen($password) < 6) {
-        $error_message = 'Mật khẩu phải có ít nhất 6 ký tự.';
+        $error_message = "Mật khẩu phải có ít nhất 6 ký tự.";
     } elseif ($password !== $password_confirm) {
-        $error_message = 'Mật khẩu xác nhận không khớp.';
+        $error_message = "Mật khẩu xác nhận không khớp.";
     } elseif (isset($users[$username])) {
-        $error_message = 'Tên đăng nhập này đã tồn tại.';
+        $error_message = "Tên đăng nhập này đã tồn tại.";
     } else {
         $users[$username] = password_hash($password, PASSWORD_DEFAULT);
         $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
-        
+
         if (file_put_contents(USERS_FILE, $content)) {
-            redirect_with_message('login.php', 'Đăng ký thành công! Bây giờ bạn có thể đăng nhập.', 'success');
+            redirect_with_message(
+                "login.php",
+                "Đăng ký thành công! Bây giờ bạn có thể đăng nhập.",
+                "success"
+            );
         } else {
-            $error_message = 'Đã có lỗi xảy ra. Không thể lưu tài khoản mới.';
+            $error_message = "Đã có lỗi xảy ra. Không thể lưu tài khoản mới.";
         }
     }
 }
@@ -239,9 +252,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST" action="register.php">
             <div class="form-group">
                 <i class="icon fas fa-user"></i>
-                <input type="text" name="username" placeholder="Tên đăng nhập"
-                    value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                    required>
+                <input type="text" name="username" placeholder="Tên đăng nhập" value="<?php echo isset($_POST["username"])
+                        ? htmlspecialchars($_POST["username"])
+                        : ""; ?>" required>
             </div>
             <div class="form-group">
                 <i class="icon fas fa-lock"></i>

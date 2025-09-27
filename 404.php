@@ -73,7 +73,9 @@
         <h1>Link Not Found</h1>
         <p>The share link you are trying to access is invalid, has been removed, or has expired. Please check the link
             and try again.</p>
-        <a href="<?php echo defined('BASE_URL') ? BASE_URL : './'; ?>" class="home-btn">Go to Homepage</a>
+        <a href="<?php echo defined("BASE_URL")
+            ? BASE_URL
+            : "./"; ?>" class="home-btn">Go to Homepage</a>
     </div>
 </body>
 

@@ -1,5 +1,5 @@
 <?php
-define("IS_PUBLIC_PAGE", true); // Prevents auth check in bootstrap.php
+define("IS_PUBLIC_PAGE", true);
 require_once "bootstrap.php";
 
 $error_message = "";
@@ -12,6 +12,27 @@ if (AUTH_ENABLED === false) {
 if (isset($_SESSION["is_logged_in"]) && $_SESSION["is_logged_in"] === true) {
     header("Location: index.php");
     exit();
+}
+
+// --- LOGIC KIỂM TRA BRUTE-FORCE ---
+define('LOGIN_ATTEMPT_LIMIT', 5);
+define('LOGIN_BLOCK_TIME_MINUTES', 15);
+
+$ip_address = $_SERVER['REMOTE_ADDR'];
+$stmt = $pdo->prepare("SELECT failed_attempts, last_attempt_at FROM login_attempts WHERE ip_address = ?");
+$stmt->execute([$ip_address]);
+$attempt_info = $stmt->fetch();
+
+if ($attempt_info && $attempt_info['failed_attempts'] >= LOGIN_ATTEMPT_LIMIT) {
+    $time_since_last_attempt = time() - $attempt_info['last_attempt_at'];
+    if ($time_since_last_attempt < (LOGIN_BLOCK_TIME_MINUTES * 60)) {
+        $remaining_time = ceil(((LOGIN_BLOCK_TIME_MINUTES * 60) - $time_since_last_attempt) / 60);
+        $error_message = "Too many failed login attempts. Please try again in {$remaining_time} minutes.";
+        goto display_page;
+    } else {
+        $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
+        $stmt->execute([$ip_address]);
+    }
 }
 
 $success_message = "";
@@ -27,18 +48,42 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password = $_POST["password"] ?? "";
     $users = AUTH_USERS;
 
-    if (
-        isset($users[$username]) &&
-        password_verify($password, $users[$username])
-    ) {
-        $_SESSION["is_logged_in"] = true;
-        $_SESSION["username"] = $username;
-        header("Location: index.php");
-        exit();
+    if (isset($users[$username]) && is_array($users[$username]) && password_verify($password, $users[$username]['password'])) {
+        // Mật khẩu đúng, xóa các lần thử thất bại
+        $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
+        $stmt->execute([$ip_address]);
+
+        $user_data = $users[$username];
+        
+        // Kiểm tra xem người dùng có bật 2FA không
+        if (isset($user_data['tfa_enabled']) && $user_data['tfa_enabled'] === true) {
+            // Lưu trạng thái bước 1 và chuyển hướng đến trang xác thực 2FA
+            $_SESSION['tfa_user'] = $username;
+            $_SESSION['tfa_passed_step1'] = true;
+            header("Location: verify_2fa.php");
+            exit();
+        } else {
+            // Đăng nhập thành công (không có 2FA)
+            $_SESSION["is_logged_in"] = true;
+            $_SESSION["username"] = $username;
+            header("Location: index.php");
+            exit();
+        }
+
     } else {
+        // Mật khẩu sai, ghi lại lần thử thất bại
+        $stmt = $pdo->prepare(
+            "INSERT INTO login_attempts (ip_address, last_attempt_at, failed_attempts) VALUES (?, ?, 1)
+             ON CONFLICT(ip_address) DO UPDATE SET
+             failed_attempts = failed_attempts + 1,
+             last_attempt_at = excluded.last_attempt_at"
+        );
+        $stmt->execute([$ip_address, time()]);
         $error_message = "Invalid username or password.";
     }
 }
+
+display_page:
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -111,7 +156,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         padding: 35px;
         width: 100%;
         max-width: 360px;
-        /* Thu nhỏ container */
         text-align: center;
         transform: scale(0.95);
         opacity: 0;
@@ -127,7 +171,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .logo {
         font-size: 3.5em;
-        /* Thu nhỏ logo */
         color: var(--accent-color);
         margin-bottom: 5px;
     }
@@ -135,7 +178,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     h1 {
         margin: 0 0 5px 0;
         font-size: 1.8em;
-        /* Thu nhỏ H1 */
         font-weight: 600;
         color: var(--text-primary);
     }
@@ -144,7 +186,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         margin-bottom: 25px;
         color: var(--text-secondary);
         font-size: 1em;
-        /* Thu nhỏ subtitle */
     }
 
     .form-group {
@@ -159,10 +200,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         transform: translateY(-50%);
         color: var(--text-secondary);
         pointer-events: none;
-        /* Icon không bắt sự kiện click */
     }
 
-    /* Icon hiện/ẩn mật khẩu */
     .form-group .password-toggle {
         position: absolute;
         right: 15px;
@@ -171,7 +210,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         color: var(--text-secondary);
         cursor: pointer;
         pointer-events: auto;
-        /* Cho phép click */
     }
 
     .form-group .password-toggle:hover {
@@ -181,7 +219,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     .form-group input {
         width: 100%;
         padding: 14px 15px 14px 45px;
-        /* Điều chỉnh padding */
         border: 1px solid var(--border-color);
         border-radius: 10px;
         font-size: 1em;
@@ -193,7 +230,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     .form-group input[type="password"] {
         padding-right: 45px;
-        /* Thêm padding bên phải cho icon con mắt */
     }
 
     .form-group input:focus {
@@ -293,10 +329,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <p class="subtitle">Welcome back! Please log in.</p>
 
         <?php if (!empty($error_message)): ?>
-        <div class="message-box error"><?php echo $error_message; ?></div>
+        <div class="message-box error"><?php echo htmlspecialchars($error_message); ?></div>
         <?php endif; ?>
         <?php if (!empty($success_message)): ?>
-        <div class="message-box success"><?php echo $success_message; ?></div>
+        <div class="message-box success"><?php echo htmlspecialchars($success_message); ?></div>
         <?php endif; ?>
 
         <form method="POST" action="login.php">
@@ -323,14 +359,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     document.addEventListener('DOMContentLoaded', function() {
         const passwordInput = document.getElementById('password');
         const toggleButton = document.getElementById('password-toggle');
-
         if (passwordInput && toggleButton) {
             toggleButton.addEventListener('click', function() {
-                // Thay đổi type của input
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
-
-                // Thay đổi icon
                 this.classList.toggle('fa-eye');
                 this.classList.toggle('fa-eye-slash');
             });

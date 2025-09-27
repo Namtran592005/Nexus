@@ -4,7 +4,6 @@
 // This file combines config.php, helpers.php, and auth_check.php
 // =================================================================
 
-// THÊM DÒNG NÀY VÀO NGAY ĐẦU TIÊN
 // Tự động nén output (HTML, JSON, etc.) nếu trình duyệt hỗ trợ
 if (substr_count($_SERVER["HTTP_ACCEPT_ENCODING"], "gzip")) {
     ob_start("ob_gzhandler");
@@ -12,7 +11,7 @@ if (substr_count($_SERVER["HTTP_ACCEPT_ENCODING"], "gzip")) {
     ob_start();
 }
 
-// --- 1. CONFIGURATION (from config.php) ---
+// --- 1. CONFIGURATION ---
 
 session_start();
 
@@ -24,9 +23,9 @@ define("MAX_FILE_SIZE", 4000 * 1024 * 1024);
 define("APP_NAME", "Nexus Drive");
 
 // --- Authentication Configuration ---
-define("AUTH_ENABLED", true); // Set to 'true' to enable login, 'false' for local development
-define("ALLOW_REGISTRATION", false); // Set to 'true' to allow registration, 'false' to disable
-define("USERS_FILE", __DIR__ . "/users.php"); // File to store user information
+define("AUTH_ENABLED", true);
+define("ALLOW_REGISTRATION", false);
+define("USERS_FILE", __DIR__ . "/users.php");
 
 // --- Auto-detect BASE_URL ---
 if (
@@ -47,7 +46,14 @@ define("BASE_URL", $protocol . $host . $path);
 
 // --- User Loading Logic ---
 if (!file_exists(USERS_FILE)) {
-    $initial_users = ["admin" => password_hash("admin", PASSWORD_DEFAULT)];
+    // Cấu trúc user mới hỗ trợ 2FA
+    $initial_users = [
+        'admin' => [
+            'password' => password_hash('admin', PASSWORD_DEFAULT),
+            'tfa_secret' => null,
+            'tfa_enabled' => false,
+        ]
+    ];
     $content = "<?php\n\nreturn " . var_export($initial_users, true) . ";\n";
     if (file_put_contents(USERS_FILE, $content) === false) {
         die(
@@ -78,7 +84,6 @@ try {
         $pdo->exec(
             "CREATE TRIGGER update_file_system_modified_at AFTER UPDATE ON file_system FOR EACH ROW BEGIN UPDATE file_system SET modified_at = CURRENT_TIMESTAMP WHERE id = OLD.id; END;"
         );
-        // Bảng share_links được tạo với các cột mới ngay từ đầu
         $pdo->exec(
             "CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `password` TEXT NULL, `expires_at` TEXT NULL, `allow_download` INTEGER NOT NULL DEFAULT 1, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
         );
@@ -90,11 +95,8 @@ try {
         );
         $pdo->commit();
     } else {
-        // LOGIC NÂNG CẤP DATABASE TỰ ĐỘNG
-        // Kiểm tra và nâng cấp bảng share_links nếu cần thiết
         $stmt = $pdo->query("PRAGMA table_info(share_links)");
         $columns = $stmt->fetchAll(PDO::FETCH_COLUMN, 1);
-
         if (!in_array("password", $columns)) {
             $pdo->exec("ALTER TABLE share_links ADD COLUMN password TEXT NULL");
         }
@@ -109,6 +111,18 @@ try {
             );
         }
     }
+
+    // Luôn chạy lệnh này để đảm bảo bảng login_attempts tồn tại.
+    // CREATE TABLE IF NOT EXISTS sẽ không làm gì nếu bảng đã có.
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS `login_attempts` (
+            `ip_address` TEXT NOT NULL,
+            `last_attempt_at` INTEGER NOT NULL,
+            `failed_attempts` INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (`ip_address`)
+        );"
+    );
+
 } catch (\PDOException $e) {
     if (strpos($e->getMessage(), "unable to open database file") !== false) {
         die(
@@ -119,7 +133,7 @@ try {
     }
 }
 
-// --- 2. HELPER FUNCTIONS (from helpers.php) ---
+// --- 2. HELPER FUNCTIONS ---
 
 function redirect_with_message($url, $message, $type = "info")
 {
@@ -144,442 +158,131 @@ function formatBytes($bytes, $precision = 2)
 function getFileIcon($fileName, $isFolder = false)
 {
     if ($isFolder) {
-        return ["icon" => "fa-folder", "color" => "#5ac8fa"]; // Giữ nguyên màu xanh cho thư mục
+        return ["icon" => "fa-folder", "color" => "#5ac8fa"];
     }
-
+    
     $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-    // Mặc định cho các file không xác định
+    
     $icon = "fa-file";
     $color = "#8a8a8e";
 
     switch ($extension) {
-        // --- Office & Documents ---
-        case "pdf":
-            $icon = "fa-file-pdf";
-            $color = "#e62e2e";
-            break;
-        case "doc":
-        case "docx":
-            $icon = "fa-file-word";
-            $color = "#2a5699";
-            break;
-        case "xls":
-        case "xlsx":
-        case "csv":
-            $icon = "fa-file-excel";
-            $color = "#217346";
-            break;
-        case "ppt":
-        case "pptx":
-            $icon = "fa-file-powerpoint";
-            $color = "#d24726";
-            break;
-        case "txt":
-        case "rtf":
-            $icon = "fa-file-alt";
-            $color = "#a0a0a5";
-            break;
-
-        // --- Archives ---
-        case "zip":
-        case "rar":
-        case "7z":
-        case "tar":
-        case "gz":
-            $icon = "fa-file-archive";
-            $color = "#f0ad4e";
-            break;
-
-        // --- Images ---
-        case "jpg":
-        case "jpeg":
-        case "png":
-        case "gif":
-        case "bmp":
-        case "webp":
-        case "heic":
-        case "tiff":
-            $icon = "fa-file-image";
-            $color = "#5cb85c";
-            break;
-        case "svg":
-            $icon = "fa-file-image";
-            $color = "#ffb13b";
-            break; // Màu khác cho vector
-
-        // --- Design Files ---
-        case "psd": // Photoshop
-            $icon = "fa-file-image";
-            $color = "#3498db";
-            break;
-        case "ai": // Illustrator
-            $icon = "fa-file-image";
-            $color = "#f39c12";
-            break;
-        case "fig": // Figma
-            $icon = "fa-file-image";
-            $color = "#a259ff";
-            break;
-
-        // --- Audio ---
-        case "mp3":
-        case "wav":
-        case "aac":
-        case "flac":
-        case "m4a":
-            $icon = "fa-file-audio";
-            $color = "#9b59b6";
-            break;
-
-        // --- Video ---
-        case "mp4":
-        case "mov":
-        case "avi":
-        case "mkv":
-        case "webm":
-            $icon = "fa-file-video";
-            $color = "#e74c3c";
-            break;
-
-        // --- Code & Text-based Files ---
-        case "html":
-        case "htm":
-            $icon = "fa-file-code";
-            $color = "#e44d26";
-            break;
-        case "css":
-        case "scss":
-        case "sass":
-            $icon = "fa-file-code";
-            $color = "#264de4";
-            break;
-        case "js":
-        case "ts":
-        case "jsx":
-        case "tsx":
-            $icon = "fa-file-code";
-            $color = "#f0db4f";
-            break;
-        case "json":
-            $icon = "fa-file-code";
-            $color = "#8a8a8e";
-            break;
-        case "xml":
-            $icon = "fa-file-code";
-            $color = "#ff6600";
-            break;
-        case "md":
-            $icon = "fa-file-alt";
-            $color = "#34495e";
-            break; // Markdown dùng icon text
-        case "php":
-            $icon = "fa-file-code";
-            $color = "#8892be";
-            break;
-        case "py":
-            $icon = "fa-file-code";
-            $color = "#3572A5";
-            break;
-        case "java":
-        case "jar":
-            $icon = "fa-file-code";
-            $color = "#b07219";
-            break;
-        case "c":
-        case "cpp":
-        case "h":
-            $icon = "fa-file-code";
-            $color = "#00599c";
-            break;
-        case "cs":
-            $icon = "fa-file-code";
-            $color = "#68217a";
-            break;
-        case "sql":
-            $icon = "fa-database";
-            $color = "#f29111";
-            break; // Dùng icon database cho SQL
-        case "sh":
-        case "bash":
-            $icon = "fa-terminal";
-            $color = "#4EAA25";
-            break; // Dùng icon terminal
-        case "yml":
-        case "yaml":
-            $icon = "fa-file-code";
-            $color = "#cb171e";
-            break;
-        case "rb":
-            $icon = "fa-file-code";
-            $color = "#CC342D";
-            break;
-        case "go":
-            $icon = "fa-file-code";
-            $color = "#00ADD8";
-            break;
-        case "swift":
-            $icon = "fa-file-code";
-            $color = "#F05138";
-            break;
-        case "kt":
-            $icon = "fa-file-code";
-            $color = "#7F52FF";
-            break;
-        case "rs":
-            $icon = "fa-file-code";
-            $color = "#000000";
-            break;
-        case "dockerfile":
-            $icon = "fa-file-code";
-            $color = "#384d54";
-            break;
-
-        // --- Fonts ---
-        case "ttf":
-        case "otf":
-        case "woff":
-        case "woff2":
-            $icon = "fa-font";
-            $color = "#94a2b0";
-            break;
-
-        // --- Executables & System ---
-        case "exe":
-        case "app":
-        case "dmg":
-            $icon = "fa-cog";
-            $color = "#34495e";
-            break;
-        case "iso":
-            $icon = "fa-compact-disc";
-            $color = "#7f8c8d";
-            break;
-        case "apk":
-            $icon = "fa-robot";
-            $color = "#a4c639";
-            break; // Icon Android
-
-        default:
-            // Giữ nguyên giá trị mặc định đã khai báo ở trên
-            break;
+        case 'pdf': $icon = 'fa-file-pdf'; $color = '#e62e2e'; break;
+        case 'doc': case 'docx': $icon = 'fa-file-word'; $color = '#2a5699'; break;
+        case 'xls': case 'xlsx': case 'csv': $icon = 'fa-file-excel'; $color = '#217346'; break;
+        case 'ppt': case 'pptx': $icon = 'fa-file-powerpoint'; $color = '#d24726'; break;
+        case 'txt': case 'rtf': $icon = 'fa-file-alt'; $color = '#a0a0a5'; break;
+        case 'zip': case 'rar': case '7z': case 'tar': case 'gz': $icon = 'fa-file-archive'; $color = '#f0ad4e'; break;
+        case 'jpg': case 'jpeg': case 'png': case 'gif': case 'bmp': case 'webp': case 'heic': case 'tiff': $icon = 'fa-file-image'; $color = '#5cb85c'; break;
+        case 'svg': $icon = 'fa-file-image'; $color = '#ffb13b'; break;
+        case 'psd': $icon = 'fa-file-image'; $color = '#3498db'; break;
+        case 'ai': $icon = 'fa-file-image'; $color = '#f39c12'; break;
+        case 'fig': $icon = 'fa-file-image'; $color = '#a259ff'; break;
+        case 'mp3': case 'wav': case 'aac': case 'flac': case 'm4a': $icon = 'fa-file-audio'; $color = '#9b59b6'; break;
+        case 'mp4': case 'mov': case 'avi': case 'mkv': case 'webm': $icon = 'fa-file-video'; $color = '#e74c3c'; break;
+        case 'html': case 'htm': $icon = 'fa-file-code'; $color = '#e44d26'; break;
+        case 'css': case 'scss': case 'sass': $icon = 'fa-file-code'; $color = '#264de4'; break;
+        case 'js': case 'ts': case 'jsx': case 'tsx': $icon = 'fa-file-code'; $color = '#f0db4f'; break;
+        case 'json': $icon = 'fa-file-code'; $color = '#8a8a8e'; break;
+        case 'xml': $icon = 'fa-file-code'; $color = '#ff6600'; break;
+        case 'md': $icon = 'fa-file-alt'; $color = '#34495e'; break;
+        case 'php': $icon = 'fa-file-code'; $color = '#8892be'; break;
+        case 'py': $icon = 'fa-file-code'; $color = '#3572A5'; break;
+        case 'java': case 'jar': $icon = 'fa-file-code'; $color = '#b07219'; break;
+        case 'c': case 'cpp': case 'h': $icon = 'fa-file-code'; $color = '#00599c'; break;
+        case 'cs': $icon = 'fa-file-code'; $color = '#68217a'; break;
+        case 'sql': $icon = 'fa-database'; $color = '#f29111'; break;
+        case 'sh': case 'bash': $icon = 'fa-terminal'; $color = '#4EAA25'; break;
+        case 'yml': case 'yaml': $icon = 'fa-file-code'; $color = '#cb171e'; break;
+        case 'rb': $icon = 'fa-file-code'; $color = '#CC342D'; break;
+        case 'go': $icon = 'fa-file-code'; $color = '#00ADD8'; break;
+        case 'swift': $icon = 'fa-file-code'; $color = '#F05138'; break;
+        case 'kt': $icon = 'fa-file-code'; $color = '#7F52FF'; break;
+        case 'rs': $icon = 'fa-file-code'; $color = '#000000'; break;
+        case 'dockerfile': $icon = 'fa-file-code'; $color = '#384d54'; break;
+        case 'ttf': case 'otf': case 'woff': case 'woff2': $icon = 'fa-font'; $color = '#94a2b0'; break;
+        case 'exe': case 'app': case 'dmg': $icon = 'fa-cog'; $color = '#34495e'; break;
+        case 'iso': $icon = 'fa-compact-disc'; $color = '#7f8c8d'; break;
+        case 'apk': $icon = 'fa-robot'; $color = '#a4c639'; break;
+        default: break;
     }
-
-    // Xử lý các file không có phần mở rộng
+    
     $name = strtolower(basename($fileName));
-    if (strpos($name, ".") === false) {
-        if ($name === "dockerfile") {
-            $icon = "fa-file-code";
-            $color = "#384d54";
+    if (strpos($name, '.') === false) {
+        if ($name === 'dockerfile') {
+            $icon = 'fa-file-code'; $color = '#384d54';
         }
     }
-
+    
     return ["icon" => $icon, "color" => $color];
 }
 
-function isImage($mimeType)
-{
-    return str_starts_with($mimeType, "image/");
-}
-function isVideo($mimeType)
-{
-    return str_starts_with($mimeType, "video/");
-}
-function isAudio($mimeType)
-{
-    return str_starts_with($mimeType, "audio/");
-}
-function isPdf($mimeType)
-{
-    return $mimeType === "application/pdf";
-}
-function isTextOrCode($mimeType)
-{
-    if (str_starts_with($mimeType, "text/")) {
+function isImage($mimeType) { return str_starts_with($mimeType, "image/"); }
+function isVideo($mimeType) { return str_starts_with($mimeType, "video/"); }
+function isAudio($mimeType) { return str_starts_with($mimeType, "audio/"); }
+
+function isEditableAsCode($fileName, $mimeType) {
+    if (str_starts_with($mimeType, 'text/') || in_array($mimeType, ['application/json', 'application/xml', 'application/javascript', 'application/x-php'])) {
         return true;
     }
-
-    $code_mimes = [
-        "application/json",
-        "application/xml",
-        "application/javascript",
-        "application/x-javascript",
-        "application/x-php",
-        "application/x-python",
-        "application/x-ruby",
-        "application/x-sql",
-        "application/x-sh",
-        "application/x-csh",
-        "application/x-httpd-php",
-        // Thêm các MIME type khác nếu cần
-    ];
-
-    return in_array($mimeType, $code_mimes);
-}
-
-// *** HÀM MỚI ĐƯỢC THÊM VÀO ĐÂY ***
-function isOfficeDoc($mimeType)
-{
-    return in_array($mimeType, [
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
-    ]);
-}
-
-function guessCodeLanguage($fileName)
-{
-    // Trả về chuỗi khớp với tên mode của ACE Editor (ví dụ: 'javascript' cho 'ace/mode/javascript')
+    $editableExtensions = ['js', 'ts', 'css', 'scss', 'sass', 'html', 'htm', 'xml', 'json', 'md', 'php', 'py', 'rb', 'go', 'java', 'cs', 'rs', 'swift', 'kt', 'kts', 'sh', 'bash', 'ps1', 'sql', 'yml', 'yaml', 'ini', 'cfg', 'conf', 'env', 'c', 'h', 'cpp', 'hpp', 'cxx', 'txt', 'log'];
     $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-    // Xử lý các trường hợp tên file không có phần mở rộng nhưng vẫn là code (ví dụ: 'Dockerfile')
     $name = strtolower(basename($fileName));
-    if ($name === "dockerfile") {
-        return "dockerfile";
+    if (in_array($name, ['dockerfile', '.gitignore'])) {
+        return true;
     }
-    // Handle dotfiles like .gitignore, .env
-    if (empty($extension) && str_starts_with($name, ".")) {
-        if ($name === ".gitignore") {
-            return "gitignore";
-        }
-        if (str_contains($name, "env")) {
-            return "ini";
-        } // Treat .env like an ini file
-        return "text";
+    if (str_starts_with($mimeType, 'image/') || str_starts_with($mimeType, 'video/') || str_starts_with($mimeType, 'audio/') || $mimeType === 'application/pdf') {
+        return false;
     }
+    return in_array($extension, $editableExtensions);
+}
 
+function guessCodeLanguage($fileName) {
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    $name = strtolower(basename($fileName));
+    if ($name === 'dockerfile') return 'dockerfile';
+    if (empty($extension) && str_starts_with($name, '.')) {
+        if ($name === '.gitignore') return 'gitignore';
+        if (str_contains($name, 'env')) return 'ini';
+        return 'text';
+    }
     switch ($extension) {
-        // Web Frontend
-        case "js":
-            return "javascript";
-        case "ts":
-            return "typescript";
-        case "css":
-            return "css";
-        case "scss":
-        case "sass":
-            return "scss";
-        case "html":
-        case "htm":
-            return "html";
-        case "xml":
-            return "xml";
-        case "json":
-            return "json";
-        case "md":
-            return "markdown";
-
-        // Web Backend & General Purpose
-        case "php":
-            return "php";
-        case "py":
-            return "python";
-        case "rb":
-            return "ruby";
-        case "go":
-            return "golang";
-        case "java":
-            return "java";
-        case "cs":
-            return "csharp";
-        case "rs":
-            return "rust";
-
-        // Mobile
-        case "swift":
-            return "swift";
-        case "kt":
-        case "kts":
-            return "kotlin";
-
-        // Scripting & Shell
-        case "sh":
-        case "bash":
-            return "sh";
-        case "ps1":
-            return "powershell";
-
-        // Database
-        case "sql":
-            return "sql";
-
-        // Config & Data
-        case "yml":
-        case "yaml":
-            return "yaml";
-        case "ini":
-        case "cfg":
-        case "conf":
-            return "ini";
-        case "env":
-            return "ini"; // Treat .env as ini for highlighting
-
-        // Low-level
-        case "c":
-        case "h":
-            return "c_cpp";
-        case "cpp":
-        case "hpp":
-        case "cxx":
-            return "c_cpp";
-
-        // Plain Text
-        case "txt":
-        case "log":
-            return "text";
-
-        default:
-            return "text"; // Mặc định là văn bản thuần túy
+        case "js": return "javascript";
+        case "ts": return "typescript";
+        case "css": return "css";
+        case "scss": case "sass": return "scss";
+        case "html": case "htm": return "html";
+        case "xml": return "xml";
+        case "json": return "json";
+        case "md": return "markdown";
+        case "php": return "php";
+        case "py": return "python";
+        case "rb": return "ruby";
+        case "go": return "golang";
+        case "java": return "java";
+        case "cs": return "csharp";
+        case "rs": return "rust";
+        case "swift": return "swift";
+        case "kt": case "kts": return "kotlin";
+        case "sh": case "bash": return "sh";
+        case "ps1": return "powershell";
+        case "sql": return "sql";
+        case "yml": case "yaml": return "yaml";
+        case "ini": case "cfg": case "conf": case "env": return "ini";
+        case "c": case "h": case "cpp": case "hpp": case "cxx": return "c_cpp";
+        case "txt": case "log": return "text";
+        default: return "text";
     }
 }
 
 function getFileTypeCategory($mimeType)
 {
-    if (str_starts_with($mimeType, "image/")) {
-        return "Images";
-    }
-    if (str_starts_with($mimeType, "video/")) {
-        return "Videos";
-    }
-    if (str_starts_with($mimeType, "audio/")) {
-        return "Audio";
-    }
-    if (
-        in_array($mimeType, [
-            "application/pdf",
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-powerpoint",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ])
-    ) {
-        return "Documents";
-    }
-    if (
-        in_array($mimeType, [
-            "application/zip",
-            "application/x-rar-compressed",
-            "application/x-7z-compressed",
-            "application/gzip",
-        ])
-    ) {
-        return "Archives";
-    }
-    if (
-        str_starts_with($mimeType, "text/") ||
-        in_array($mimeType, [
-            "application/json",
-            "application/xml",
-            "application/javascript",
-        ])
-    ) {
-        return "Code & Text";
-    }
+    if (str_starts_with($mimeType, "image/")) return "Images";
+    if (str_starts_with($mimeType, "video/")) return "Videos";
+    if (str_starts_with($mimeType, "audio/")) return "Audio";
+    if (in_array($mimeType, ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"])) return "Documents";
+    if (in_array($mimeType, ["application/zip", "application/x-rar-compressed", "application/x-7z-compressed", "application/gzip"])) return "Archives";
+    if (str_starts_with($mimeType, "text/") || in_array($mimeType, ["application/json", "application/xml", "application/javascript"])) return "Code & Text";
     return "Other";
 }
 
@@ -606,91 +309,6 @@ function getItemIdByPath($pdo, $path)
         }
     }
     return $itemId;
-}
-
-function isEditableAsCode($fileName, $mimeType)
-{
-    // Ưu tiên 1: Kiểm tra các MIME type văn bản rõ ràng.
-    if (
-        str_starts_with($mimeType, "text/") ||
-        in_array($mimeType, [
-            "application/json",
-            "application/xml",
-            "application/javascript",
-            "application/x-php",
-        ])
-    ) {
-        return true;
-    }
-
-    // Ưu tiên 2 (quan trọng nhất): Kiểm tra phần mở rộng của tệp.
-    $editableExtensions = [
-        // Web Frontend
-        "js",
-        "ts",
-        "css",
-        "scss",
-        "sass",
-        "html",
-        "htm",
-        "xml",
-        "json",
-        "md",
-        // Web Backend & General Purpose
-        "php",
-        "py",
-        "rb",
-        "go",
-        "java",
-        "cs",
-        "rs",
-        // Mobile
-        "swift",
-        "kt",
-        "kts",
-        // Scripting & Shell
-        "sh",
-        "bash",
-        "ps1",
-        // Database
-        "sql",
-        // Config & Data
-        "yml",
-        "yaml",
-        "ini",
-        "cfg",
-        "conf",
-        "env",
-        // Low-level
-        "c",
-        "h",
-        "cpp",
-        "hpp",
-        "cxx",
-        // Plain Text
-        "txt",
-        "log",
-    ];
-
-    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-    // Xử lý các file không có phần mở rộng nhưng vẫn là code (ví dụ: 'Dockerfile', '.gitignore')
-    $name = strtolower(basename($fileName));
-    if (in_array($name, ["dockerfile", ".gitignore"])) {
-        return true;
-    }
-
-    // Nếu Mime Type là binary thì chắc chắn không phải code
-    if (
-        str_starts_with($mimeType, "image/") ||
-        str_starts_with($mimeType, "video/") ||
-        str_starts_with($mimeType, "audio/") ||
-        $mimeType === "application/pdf"
-    ) {
-        return false;
-    }
-
-    return in_array($extension, $editableExtensions);
 }
 
 function getPathByItemId($pdo, $id)
@@ -732,7 +350,7 @@ function deleteFolderRecursiveDb($pdo, $folderId)
     $deleteStmt->execute([$folderId]);
 }
 
-// --- 3. AUTHENTICATION CHECK (from auth_check.php) ---
+// --- 3. AUTHENTICATION CHECK ---
 
 if (!defined("IS_PUBLIC_PAGE") || IS_PUBLIC_PAGE !== true) {
     if (AUTH_ENABLED === false) {

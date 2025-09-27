@@ -62,6 +62,10 @@ if (isset($_SESSION["message"])) {
     <!-- ACE Editor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ace.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ext-themelist.js"></script>
+    <!-- Flatpickr - Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <style>
     /* --- CSS is unchanged, it remains the same as in your original file --- */
@@ -1051,34 +1055,44 @@ if (isset($_SESSION["message"])) {
         flex-shrink: 0;
     }
 
-    .modal-footer .btn {
+    /* === BẮT ĐẦU KHỐI CSS NÚT ĐÃ NÂNG CẤP === */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
         padding: 10px 20px;
         border: none;
         border-radius: var(--radius-default);
         cursor: pointer;
         font-weight: 500;
+        font-size: 0.95em;
+        text-decoration: none;
+        /* Quan trọng cho thẻ <a> */
         transition: all var(--transition-speed-fast) var(--transition-timing-function);
     }
 
-    .modal-footer .btn:hover {
+    .btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 2px 8px var(--shadow-color);
     }
 
-    .modal-footer .btn-cancel {
+    .btn-cancel {
         background-color: var(--highlight-color);
         color: var(--text-primary);
     }
 
-    .modal-footer .btn-primary {
+    .btn-primary {
         background-color: var(--text-accent);
         color: white;
     }
 
-    .modal-footer .btn-danger {
+    .btn-danger {
         background-color: var(--danger-color);
         color: white;
     }
+
+    /* === KẾT THÚC KHỐI CSS NÚT ĐÃ NÂNG CẤP === */
 
     #uploadModal .modal-content {
         max-width: 600px;
@@ -1765,6 +1779,147 @@ if (isset($_SESSION["message"])) {
         scrollbar-width: thin;
         scrollbar-color: var(--bg-tertiary) var(--bg-primary);
     }
+
+    /* --- CSS MỚI CHO GIAO DIỆN CHỌN NGÀY HẾT HẠN --- */
+    .expiry-options-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .expiry-quick-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .expiry-quick-buttons .btn-quick-expiry {
+        background-color: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        padding: 6px 12px;
+        border-radius: var(--radius-default);
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.2s ease;
+    }
+
+    .expiry-quick-buttons .btn-quick-expiry:hover {
+        background-color: var(--highlight-color);
+        color: var(--text-primary);
+        border-color: var(--text-accent);
+    }
+
+    .expiry-quick-buttons .btn-quick-expiry.active {
+        background-color: var(--selection-color);
+        color: var(--text-accent);
+        border-color: var(--text-accent);
+        font-weight: 500;
+    }
+
+    .custom-date-picker-wrapper {
+        position: relative;
+    }
+
+    #shareExpiryCustom {
+        background-color: var(--bg-tertiary);
+        padding-right: 35px;
+        /* Thêm không gian cho nút clear */
+        cursor: pointer;
+    }
+
+    .clear-date-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 5px;
+        display: none;
+        /* Mặc định ẩn */
+    }
+
+    .clear-date-btn:hover {
+        color: var(--text-primary);
+    }
+
+    /* === BẮT ĐẦU KHỐI CSS RESPONSIVE CHO MODAL === */
+
+    @media (max-width: 768px) {
+
+        /* -- Quy tắc chung cho TẤT CẢ các modal trên mobile -- */
+        .modal-content {
+            /* Chiếm gần hết màn hình, có khoảng đệm nhỏ */
+            width: 95%;
+            max-width: calc(100vw - 20px);
+            max-height: 85vh;
+            /* Giảm padding bên trong để có thêm không gian */
+            padding: 0;
+        }
+
+        .modal-header,
+        .modal-body,
+        .modal-footer {
+            padding: 15px;
+            /* Giảm padding từ 24px xuống 15px */
+        }
+
+        .modal-header h2 {
+            font-size: 1.1em;
+            /* Thu nhỏ tiêu đề modal */
+        }
+
+        /* -- Quy tắc ĐẶC BIỆT cho Modal Xem trước (Preview & Code Editor) -- */
+        #previewModal .modal-content,
+        #previewModal.modal-maximized .modal-content {
+            /* Ép nó chiếm 100% màn hình, không còn là modal nữa */
+            width: 100vw;
+            height: 100vh;
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 0;
+            top: 0;
+            left: 0;
+        }
+
+        #previewModal .modal-header {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        /* Đảm bảo body của modal (chứa code editor) chiếm hết không gian còn lại */
+        #previewModal .modal-body {
+            height: 100%;
+            /* Rất quan trọng cho ACE editor */
+        }
+
+        /* -- Quy tắc cho Modal Thông tin User -- */
+        #userInfoModal .tab-nav {
+            padding: 0 15px;
+            /* Giảm padding */
+        }
+
+        #userInfoModal .tab-nav-item {
+            padding: 12px 10px;
+            /* Làm cho các tab nhỏ gọn hơn */
+            font-size: 0.9em;
+        }
+
+        #storageChartContainer {
+            height: 200px;
+            /* Giảm chiều cao biểu đồ trên mobile */
+        }
+
+        /* Ẩn nút maximize không cần thiết trên mobile vì nó đã full screen */
+        .hide-on-mobile {
+            display: none !important;
+        }
+    }
+
+    /* === KẾT THÚC KHỐI CSS RESPONSIVE CHO MODAL === */
     </style>
 </head>
 
@@ -1968,8 +2123,20 @@ $_COOKIE["theme"] === "light"
                         <input type="password" id="sharePassword" placeholder="Protect with a password">
                     </div>
                     <div class="form-group">
-                        <label for="shareExpiry">Expiration Date (optional)</label>
-                        <input type="date" id="shareExpiry">
+                        <label for="shareExpiryCustom">Expiration Date (optional)</label>
+                        <div class="expiry-options-container">
+                            <div class="expiry-quick-buttons">
+                                <button type="button" class="btn-quick-expiry" data-days="1">1 Day</button>
+                                <button type="button" class="btn-quick-expiry" data-days="7">7 Days</button>
+                                <button type="button" class="btn-quick-expiry" data-days="30">30 Days</button>
+                            </div>
+                            <div class="custom-date-picker-wrapper">
+                                <input type="text" id="shareExpiryCustom" placeholder="Or pick a custom date..."
+                                    readonly>
+                                <button type="button" class="clear-date-btn" id="clearExpiryBtn"
+                                    title="Clear date">&times;</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group form-group-inline">
                         <input type="checkbox" id="shareAllowDownload" checked style="width: 18px; height: 18px;">
@@ -2012,8 +2179,8 @@ $_COOKIE["theme"] === "light"
                 <h2 id="previewModalTitle"></h2>
                 <div id="previewHeaderActions" class="header-actions" style="display: none;"></div>
                 <!-- NÚT MỚI ĐƯỢC THÊM -->
-                <button id="previewMaximizeBtn" class="icon-btn" onclick="togglePreviewFullscreen()" title="Maximize"
-                    style="font-size: 1em; margin-left: auto; margin-right: 10px;">
+                <button id="previewMaximizeBtn" class="icon-btn hide-on-mobile" onclick="togglePreviewFullscreen()"
+                    title="Maximize" style="font-size: 1em; margin-left: auto; margin-right: 10px;">
                     <i class="fas fa-expand"></i>
                 </button>
                 <button class="close-button" onclick="closeModal('previewModal')"><i class="fas fa-times"></i></button>
@@ -2033,6 +2200,7 @@ $_COOKIE["theme"] === "light"
             <div class="modal-body">
                 <div class="tab-nav">
                     <div class="tab-nav-item active" data-tab="overview">Overview</div>
+                    <div class="tab-nav-item" data-tab="security">Security</div>
                     <div class="tab-nav-item" data-tab="about">About</div>
                 </div>
                 <div class="tab-content">
@@ -2051,7 +2219,20 @@ $_COOKIE["theme"] === "light"
                             <span><?php echo TOTAL_STORAGE_GB; ?> GB total</span>
                         </div>
                         <div id="storageChartContainer"><canvas id="storageChart"></canvas></div>
+
                     </div>
+                    <!-- === BẮT ĐẦU KHỐI MÃ BỊ THIẾU === -->
+                    <div class="tab-pane" id="tab-security">
+                        <h4 style="margin-top:0;">Two-Factor Authentication (2FA)</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.9em; line-height: 1.6;">
+                            Add an extra layer of security to your account. Once enabled, you will be required to
+                            enter a 6-digit code from your authenticator app each time you log in.
+                        </p>
+                        <a href="setup_2fa.php" class="btn btn-primary" style="margin-top: 10px;">
+                            <i class="fas fa-shield-alt"></i> Manage 2FA Settings
+                        </a>
+                    </div>
+                    <!-- === KẾT THÚC KHỐI MÃ BỊ THIẾU === -->
                     <div class="tab-pane" id="tab-about">
                         <div class="about-section">
                             <div class="logo"><i class="fas fa-cloud-bolt"></i></div>
@@ -2537,6 +2718,9 @@ function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
     closeDetailsPanel();
 }
 
+// Biến toàn cục để lưu instance của flatpickr
+let flatpickrInstance = null;
+
 async function openShareModal(fileId) {
     openModal('shareModal');
     $('#shareFileId').value = fileId;
@@ -2548,23 +2732,63 @@ async function openShareModal(fileId) {
     const saveBtn = $('#saveShareSettingsBtn');
     const linkInput = $('#shareLinkInput');
 
-    // Reset and show loading state
+    // === BẮT ĐẦU NÂNG CẤP LOGIC NGÀY HẾT HẠN ===
+    const customDateInput = $('#shareExpiryCustom');
+    const clearDateBtn = $('#clearExpiryBtn');
+
+    // Hủy instance cũ nếu có để tránh lỗi
+    if (flatpickrInstance) {
+        flatpickrInstance.destroy();
+    }
+
+    // Khởi tạo Flatpickr
+    flatpickrInstance = flatpickr(customDateInput, {
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        // === LOGIC MỚI: Tự động chọn theme dựa trên chế độ hiện tại ===
+        "theme": document.body.classList.contains('dark-mode') ? "dark" : "light",
+        onChange: function(selectedDates, dateStr, instance) {
+            // Hiển thị nút xóa khi có ngày được chọn
+            clearDateBtn.style.display = dateStr ? 'block' : 'none';
+            // Xóa active khỏi các nút chọn nhanh
+            $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
+        }
+    });
+
+    const resetExpiryUI = () => {
+        flatpickrInstance.clear();
+        clearDateBtn.style.display = 'none';
+        $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
+    };
+
+    clearDateBtn.onclick = resetExpiryUI;
+
+    $$('.btn-quick-expiry').forEach(button => {
+        button.onclick = () => {
+            $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+            const days = parseInt(button.dataset.days, 10);
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            flatpickrInstance.setDate(date, true);
+        };
+    });
+    // === KẾT THÚC NÂNG CẤP LOGIC NGÀY HẾT HẠN ===
+
     linkSection.style.display = 'none';
     createSection.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
     optionsSection.style.display = 'none';
     removeBtn.style.display = 'none';
     saveBtn.textContent = 'Create Link';
-    $('#share-modal-body').querySelectorAll('input').forEach(i => {
-        if (i.type === 'checkbox') i.checked = true;
-        else if (i.type !== 'hidden') i.value = '';
-    });
+    $('#share-modal-body').querySelectorAll('input[type="password"]').forEach(i => i.value = '');
+    $('#shareAllowDownload').checked = true;
+    resetExpiryUI(); // Reset giao diện chọn ngày
 
     const result = await apiCall('get_share_details', {
         file_id: fileId
     });
 
     if (result.success && result.details) {
-        // Link đã tồn tại
         linkSection.style.display = 'block';
         createSection.style.display = 'none';
         optionsSection.style.display = 'block';
@@ -2574,14 +2798,17 @@ async function openShareModal(fileId) {
         linkInput.value = `${G.BASE_URL}share.php?id=${result.details.id}`;
         $('#sharePassword').placeholder = result.details.has_password ? 'Password is set. Enter new to change.' :
             'Protect with a password';
-        $('#shareExpiry').value = result.details.expires_at ? result.details.expires_at.split(' ')[0] : '';
         $('#shareAllowDownload').checked = result.details.allow_download == 1;
+
+        // Đặt ngày hết hạn hiện tại (nếu có)
+        if (result.details.expires_at) {
+            flatpickrInstance.setDate(result.details.expires_at.split(' ')[0], false);
+        }
     } else {
-        // Link chưa tồn tại
         createSection.innerHTML =
             '<p style="text-align: center; color: var(--text-secondary);">This file is not currently shared.</p>';
         createSection.style.display = 'block';
-        optionsSection.style.display = 'block'; // Vẫn hiện option để tạo link mới
+        optionsSection.style.display = 'block';
     }
 }
 
@@ -2848,12 +3075,30 @@ function closeModal(id) {
 function toggleTheme() {
     const isLight = document.body.classList.toggle('light-mode');
     document.cookie = `theme=${isLight ? 'light' : 'dark'}; path=/; max-age=31536000`;
+
+    // Cập nhật biểu đồ
     if (G.storageChartInstance) {
         G.storageChartInstance.destroy();
         G.storageChartInstance = null;
         renderStorageChart();
     }
+
+    // === LOGIC MỚI: Cập nhật theme của Flatpickr nếu nó đang tồn tại ===
+    if (flatpickrInstance) {
+        // Tìm element cha của lịch
+        const calendar = flatpickrInstance.calendarContainer;
+        if (calendar) {
+            if (isLight) {
+                calendar.classList.remove('dark');
+                calendar.classList.add('light');
+            } else {
+                calendar.classList.remove('light');
+                calendar.classList.add('dark');
+            }
+        }
+    }
 }
+
 const sidebar = $('.sidebar'),
     overlay = $('#overlay');
 
@@ -2882,9 +3127,23 @@ function showConfirmModal(title, message, onConfirmCallback) {
 
 function showUserInfoModal() {
     openModal('userInfoModal');
-    setTimeout(() => {
-        if (!G.storageChartInstance) renderStorageChart();
-    }, 100);
+
+    // Đặt lại trạng thái các tab về mặc định khi mở modal
+    const modal = $('#userInfoModal');
+    modal.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el.classList.remove('active'));
+
+    const overviewTab = modal.querySelector('.tab-nav-item[data-tab="overview"]');
+    const overviewPane = modal.querySelector('#tab-overview');
+
+    if (overviewTab && overviewPane) {
+        overviewTab.classList.add('active');
+        overviewPane.classList.add('active');
+    }
+
+    // Chỉ render biểu đồ KHI tab overview được active VÀ biểu đồ chưa được vẽ
+    if (!G.storageChartInstance) {
+        setTimeout(() => renderStorageChart(), 50); // Thêm một độ trễ nhỏ để đảm bảo modal hiển thị
+    }
 }
 
 function renderStorageChart() {
@@ -3103,15 +3362,20 @@ async function openPreviewModal(id, name) {
 async function saveShareSettings() {
     const fileId = $('#shareFileId').value;
     const password = $('#sharePassword').value;
-    const expires_at = $('#shareExpiry').value;
+    // Lấy ngày từ flatpickr instance thay vì input cũ
+    const expires_at = flatpickrInstance.selectedDates.length > 0 ? flatpickrInstance.formatDate(flatpickrInstance
+        .selectedDates[0], "Y-m-d") : null;
     const allow_download = $('#shareAllowDownload').checked ? 1 : 0;
+
     const data = {
         file_id: fileId,
         allow_download: allow_download
     };
     if (password) data.password = password;
     if (expires_at) data.expires_at = expires_at;
+
     const result = await apiCall('update_share_link', data);
+
     if (result.success) {
         showToast('Share settings saved!');
         $('#shareLinkInput').value = `${G.BASE_URL}share.php?id=${result.share_id}`;
@@ -3124,6 +3388,7 @@ async function saveShareSettings() {
             'Protect with a password';
     }
 }
+
 async function removeShareLink() {
     const fileId = $('#shareFileId').value;
     showConfirmModal('Remove Share Link',
@@ -3720,9 +3985,7 @@ function formatBytesJS(bytes, decimals = 2) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const sessionMessage = <?php echo !empty($session_message)
-        ? $session_message
-        : "null"; ?>;
+    const sessionMessage = <?php echo !empty($session_message) ? $session_message : 'null'; ?>;
     if (sessionMessage) {
         showToast(sessionMessage.text, sessionMessage.type);
     }
@@ -3792,6 +4055,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mainContentArea = $('.content-area');
     mainContentArea.addEventListener('click', (e) => {
+        if (document.querySelector('.modal.show')) {
+            return;
+        }
         const item = e.target.closest('.selectable');
         if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay') || (e.target
                 .closest('.grid-item') && e.target.closest('.grid-item').getAttribute('onclick')))
@@ -3810,6 +4076,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     mainContentArea.addEventListener('dblclick', (e) => {
+        if (document.querySelector('.modal.show')) {
+            return;
+        }
         const item = e.target.closest('.selectable');
         if (!item) return;
         if (item.dataset.type === 'folder' && G.currentPage === 'browse') {
@@ -3822,12 +4091,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     mainContentArea.addEventListener('contextmenu', e => {
-        // THÊM LOGIC MỚI: Nếu có bất kỳ modal nào đang hiển thị, không làm gì cả.
         if (document.querySelector('.modal.show')) {
             return;
         }
-
-        // Giữ nguyên logic cũ
         const item = e.target.closest('.selectable');
         if (item) {
             e.preventDefault();
@@ -3859,15 +4125,36 @@ document.addEventListener('DOMContentLoaded', () => {
             popover.classList.remove('show');
         }
     });
+
+    // === BẮT ĐẦU KHỐI LOGIC ĐÚNG CHO TAB ===
     $$('.tab-nav-item').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabContainer = tab.closest('.modal-body');
-            tabContainer.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el.classList
-                .remove('active'));
+            if (!tabContainer) return;
+
+            // Xóa active class khỏi tất cả các tab và content pane
+            tabContainer.querySelectorAll('.tab-nav-item').forEach(el => el.classList.remove(
+                'active'));
+            tabContainer.querySelectorAll('.tab-pane').forEach(el => el.classList.remove(
+                'active'));
+
+            // Thêm active class cho tab được click
             tab.classList.add('active');
-            $('#tab-' + tab.dataset.tab).classList.add('active');
+
+            // Thêm active class cho content pane tương ứng
+            const tabContentId = '#tab-' + tab.dataset.tab;
+            const tabContent = tabContainer.querySelector(tabContentId);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+
+            // Nếu người dùng click vào tab overview và biểu đồ chưa được vẽ, hãy vẽ nó.
+            if (tab.dataset.tab === 'overview' && !G.storageChartInstance) {
+                setTimeout(() => renderStorageChart(), 50);
+            }
         });
     });
+    // === KẾT THÚC KHỐI LOGIC ĐÚNG CHO TAB ===
 
     $('#folder-tree-container').addEventListener('click', e => {
         const folderItem = e.target.closest('.folder-item');

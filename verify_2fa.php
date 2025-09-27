@@ -1,60 +1,56 @@
 <?php
 define("IS_PUBLIC_PAGE", true);
 require_once "bootstrap.php";
+require_once "src/lib/TwoFactorAuth.php"; // SỬA ĐỔI Ở ĐÂY
 
-if (AUTH_ENABLED === false) {
-    redirect_with_message("index.php", "Authentication is disabled, registration is not available.", "error");
+use RobThree\Auth\TwoFactorAuth;
+use RobThree\Auth\TwoFactorAuthException;
+
+// Người dùng phải qua bước 1 (nhập password) trước
+if (!isset($_SESSION['tfa_passed_step1']) || $_SESSION['tfa_passed_step1'] !== true) {
+    header("Location: login.php");
+    exit();
 }
-if (ALLOW_REGISTRATION !== true) {
-    redirect_with_message("login.php", "Registration is currently disabled.", "error");
+
+$username = $_SESSION['tfa_user'];
+$users = AUTH_USERS;
+$user_data = $users[$username] ?? null;
+
+if (!$user_data || !$user_data['tfa_enabled']) {
+    session_destroy();
+    header("Location: login.php");
+    exit();
 }
 
 $error_message = "";
-
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $username = trim($_POST["username"] ?? "");
-    $password = $_POST["password"] ?? "";
-    $password_confirm = $_POST["password_confirm"] ?? "";
-
-    $users = AUTH_USERS;
-
-    if (empty($username) || empty($password)) {
-        $error_message = "Username and password cannot be empty.";
-    } elseif (strlen($username) < 3) {
-        $error_message = "Username must be at least 3 characters long.";
-    } elseif (preg_match("/[^A-Za-z0-9_]/", $username)) {
-        $error_message = "Username can only contain letters, numbers, and underscores (_).";
-    } elseif (strlen($password) < 6) {
-        $error_message = "Password must be at least 6 characters long.";
-    } elseif ($password !== $password_confirm) {
-        $error_message = "Password confirmation does not match.";
-    } elseif (isset($users[$username])) {
-        $error_message = "This username already exists.";
-    } else {
-        // TẠO USER VỚI CẤU TRÚC MỚI ĐẦY ĐỦ
-        $users[$username] = [
-            'password' => password_hash($password, PASSWORD_DEFAULT),
-            'tfa_secret' => null,
-            'tfa_enabled' => false,
-        ];
-
-        $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
-
-        if (file_put_contents(USERS_FILE, $content)) {
-            redirect_with_message("login.php", "Registration successful! You can now log in.", "success");
+    $code = $_POST["code"] ?? "";
+    
+    try {
+        $tfa = new TwoFactorAuth(APP_NAME); // SỬA ĐỔI Ở ĐÂY
+        if ($tfa->verifyCode($user_data['tfa_secret'], $code)) {
+            // Xác thực thành công
+            unset($_SESSION['tfa_user'], $_SESSION['tfa_passed_step1']);
+            $_SESSION["is_logged_in"] = true;
+            $_SESSION["username"] = $username;
+            header("Location: index.php");
+            exit();
         } else {
-            $error_message = "An error occurred. Could not save the new account.";
+            $error_message = "Invalid authentication code.";
         }
+    } catch (TwoFactorAuthException $e) {
+        $error_message = "An error occurred during verification.";
     }
 }
 ?>
+<!-- PHẦN HTML GIỮ NGUYÊN NHƯ TRƯỚC -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo APP_NAME; ?> - Register</title>
+    <title><?php echo APP_NAME; ?> - Two-Factor Authentication</title>
     <link rel="icon" type="image/x-icon" href="./src/image/favicon.ico">
     <link rel="stylesheet" href="./src/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
@@ -118,7 +114,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         border: 1px solid rgba(255, 255, 255, 0.1);
         padding: 35px;
         width: 100%;
-        max-width: 400px;
+        max-width: 380px;
         text-align: center;
         transform: scale(0.95);
         opacity: 0;
@@ -133,10 +129,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     h1 {
-        margin: 0 0 25px 0;
-        font-size: 2em;
+        margin: 0 0 10px 0;
+        font-size: 1.8em;
         font-weight: 600;
         color: var(--text-primary);
+    }
+
+    .subtitle {
+        margin-bottom: 25px;
+        color: var(--text-secondary);
+        font-size: 1em;
     }
 
     .form-group {
@@ -144,20 +146,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         margin-bottom: 20px;
     }
 
-    .form-group .icon {
-        position: absolute;
-        left: 15px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-secondary);
-    }
-
     .form-group input {
         width: 100%;
-        padding: 14px 15px 14px 45px;
+        padding: 14px 15px;
         border: 1px solid var(--border-color);
         border-radius: 10px;
-        font-size: 1em;
+        font-size: 1.5em;
+        letter-spacing: 0.5em;
+        text-align: center;
         box-sizing: border-box;
         background-color: transparent;
         color: var(--text-primary);
@@ -184,17 +180,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         margin-top: 10px;
     }
 
-    .btn-submit:hover {
+    .btn-submit:hover,
+    .btn-submit:focus {
         background-color: var(--accent-color-hover);
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(0, 122, 255, 0.2);
+        outline: none;
     }
 
     .message-box {
-        padding: 12px;
+        padding: 10px;
         border-radius: 8px;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         text-align: center;
+        font-size: 0.9em;
         font-weight: 500;
     }
 
@@ -228,46 +227,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
     }
 
-    .login-link {
-        margin-top: 25px;
-        color: var(--text-secondary);
+    .logout-link {
+        margin-top: 20px;
         font-size: 0.9em;
     }
 
-    .login-link a {
-        color: var(--accent-color);
+    .logout-link a {
+        color: var(--text-secondary);
         text-decoration: none;
-        font-weight: 500;
     }
     </style>
 </head>
 
 <body>
     <div class="login-container">
-        <h1>Create Account</h1>
+        <h1>Two-Factor Authentication</h1>
+        <p class="subtitle">Open your authenticator app and enter the 6-digit code.</p>
+
         <?php if (!empty($error_message)): ?>
         <div class="message-box error"><?php echo htmlspecialchars($error_message); ?></div>
         <?php endif; ?>
-        <form method="POST" action="register.php">
+
+        <form method="POST" action="verify_2fa.php">
             <div class="form-group">
-                <i class="icon fas fa-user"></i>
-                <input type="text" name="username" placeholder="Username"
-                    value="<?php echo isset($_POST["username"]) ? htmlspecialchars($_POST["username"]) : ""; ?>"
-                    required>
+                <input type="text" id="code" name="code" pattern="[0-9]*" maxlength="6" inputmode="numeric" required
+                    autofocus autocomplete="one-time-code">
             </div>
-            <div class="form-group">
-                <i class="icon fas fa-lock"></i>
-                <input type="password" name="password" placeholder="Password (min. 6 characters)" required>
-            </div>
-            <div class="form-group">
-                <i class="icon fas fa-check-circle"></i>
-                <input type="password" name="password_confirm" placeholder="Confirm Password" required>
-            </div>
-            <button type="submit" class="btn-submit">Register</button>
+            <button type="submit" class="btn-submit">Verify</button>
         </form>
-        <p class="login-link">
-            Already have an account? <a href="login.php">Log In</a>
-        </p>
+        <p class="logout-link"><a href="logout.php">Cancel and log out</a></p>
     </div>
 </body>
 

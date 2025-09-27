@@ -91,10 +91,6 @@ This project is released under the [MIT License](LICENSE).
 
 ---
 
-# Bản gốc tiếng Việt
-
-(Đã lược bỏ phần so sánh với Tiny File Manager)
-
 # Vietnamese
 
 ## Giới thiệu

@@ -62,7 +62,6 @@ if (isset($_SESSION["message"])) {
     <script src="./src/js/prism-line-numbers.min.js"></script>
     <script src="./src/js/prism-core.min.js"></script>
     <script src="./src/js/prism-autoloader.min.js"></script>
-    <script src="./src/js/pdf.mjs" type="module"></script>
     <script src="./src/js/chart.js"></script>
     <style>
     /* --- CSS is unchanged, it remains the same as in your original file --- */
@@ -1551,50 +1550,32 @@ if (isset($_SESSION["message"])) {
         color: var(--text-primary);
     }
 
-    /* TÙY CHỈNH THANH CUỘN CHO GIAO DIỆN */
-
-    /* Cho các trình duyệt WebKit (Chrome, Safari, Edge, Opera) */
-    ::-webkit-scrollbar {
-        width: 8px;
-        /* Chiều rộng cho thanh cuộn dọc */
-        height: 8px;
-        /* Chiều cao cho thanh cuộn ngang */
+    /* CSS Nâng cấp cho Modal xem trước toàn màn hình */
+    #previewModal .modal-content-fullscreen {
+        width: 90vw;
+        /* Giảm một chút để không quá sát cạnh */
+        max-width: 1400px;
+        /* Thêm max-width cho màn hình siêu rộng */
+        height: 90vh;
+        max-height: 90vh;
+        /* Sử dụng flexbox để kiểm soát layout bên trong */
+        display: flex;
+        flex-direction: column;
     }
 
-    ::-webkit-scrollbar-track {
-        background: var(--bg-primary);
-        /* Màu nền của rãnh cuộn */
+    /* Bắt buộc modal-body chiếm hết không gian còn lại */
+    #previewModal .modal-content-fullscreen .modal-body {
+        flex-grow: 1;
+        /* Rất quan trọng */
+        padding: 0;
+        overflow: hidden;
+        /* Body không cần cuộn, iframe sẽ cuộn */
     }
 
-    ::-webkit-scrollbar-thumb {
-        background-color: var(--bg-tertiary);
-        /* Màu của con trượt */
-        border-radius: 4px;
-        /* Bo tròn góc con trượt */
-        border: 2px solid var(--bg-primary);
-        /* Tạo khoảng cách giữa con trượt và rãnh */
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background-color: var(--border-color);
-        /* Màu con trượt khi di chuột qua */
-    }
-
-    /* Cho Firefox */
-    /* Áp dụng cho các phần tử có thể cuộn */
-    .content-area,
-    .sidebar,
-    #details-panel-body,
-    #live-search-results,
-    .modal-body,
-    #folder-tree-container,
-    #upload-progress-list,
-    #previewContent,
-    #pdf-viewer-container {
-        scrollbar-width: thin;
-        /* 'auto', 'thin', 'none' */
-        scrollbar-color: var(--bg-tertiary) var(--bg-primary);
-        /* màu con trượt và màu rãnh */
+    #previewModal .modal-content-fullscreen #previewContent,
+    #previewModal .modal-content-fullscreen #previewContent iframe {
+        width: 100%;
+        height: 100%;
     }
     </style>
 </head>
@@ -1968,11 +1949,9 @@ function showToast(message, type = 'success') {
     }, 4000);
 }
 
-// THAY THẾ HÀM apiCall CŨ BẰNG HÀM NÀY
 async function apiCall(action, data = {}, method = 'POST', showToastOnError = true) {
     try {
         let response;
-        // ... (phần logic fetch GET/POST giữ nguyên)
         if (method === 'POST') {
             const formData = new FormData();
             formData.append('action', action);
@@ -2013,11 +1992,9 @@ async function apiCall(action, data = {}, method = 'POST', showToastOnError = tr
             data,
             error
         });
-        // Chỉ hiển thị toast nếu được yêu cầu
         if (showToastOnError) {
             showToast(error.message, 'danger');
         }
-        // Trả về một promise bị reject để .catch() có thể hoạt động
         return Promise.reject(error);
     }
 }
@@ -2122,8 +2099,7 @@ async function navigateToPath(url, isPopState = false) {
         }, '', url);
     }
 
-    $('#main-content-area').innerHTML =
-        '<div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+    $('#main-content-area').innerHTML = '<div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
 
     const params = Object.fromEntries(fullUrl.searchParams);
     const data = await apiCall('get_view_data', params, 'GET');
@@ -2276,7 +2252,7 @@ function showActionPopover(targetElement, e) {
         if (type !== 'folder') {
             content +=
                 `<a class="popover-item" href="api.php?action=download_file&id=${id}"><i class="fas fa-download"></i> Download</a>
-                            <button type="button" class="popover-item" onclick="openShareModal(${id},'${shareId}')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button type="button" class="popover-item" onclick="openShareModal(${id})"><i class="fas fa-share-alt"></i> Share</button>
                             <button type="button" class="popover-item" onclick="openPreviewModal('${escapeJS(name)}', ${id})"><i class="fas fa-eye"></i> View</button>`;
         }
         content +=
@@ -2328,46 +2304,42 @@ function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
     closeDetailsPanel();
 }
 
-// Các hàm còn lại giữ nguyên...
-// THAY THẾ HÀM batchDeleteSelected CŨ BẰNG HÀM NÀY
 async function batchDeleteSelected(isPermanent = false) {
     const selectedItems = $$('.selectable.selected');
     if (selectedItems.length === 0) return;
-
     const selectedIds = selectedItems.map(el => el.dataset.id);
     const msgAction = G.currentPage === 'trash' || isPermanent ? 'permanently delete' : 'move to trash';
     const message = `Are you sure you want to ${msgAction} ${selectedIds.length} item(s)?`;
-
     showConfirmModal('Confirm Deletion', message, () => {
-        // --- Optimistic UI Update ---
-        // 1. Ẩn các mục khỏi giao diện ngay lập tức
         const originalParents = new Map();
         selectedItems.forEach(item => {
-            originalParents.set(item, item.parentNode); // Lưu lại vị trí cũ
+            originalParents.set(item, item.parentNode);
             item.style.transition = 'opacity 0.3s ease';
             item.style.opacity = '0';
         });
-
-        // Sau khi hiệu ứng mờ kết thúc, xóa hẳn khỏi DOM
         setTimeout(() => {
             selectedItems.forEach(item => item.remove());
-            updateUIOnItemChange([], []); // Cập nhật lại số lượng item
+            updateUIOnItemChange([], []);
         }, 300);
-
         showToast(`${selectedIds.length} item(s) moved to trash.`, 'info');
-
-        // 2. Gửi yêu cầu API trong nền
         apiCall('delete', {
                 ids: selectedIds,
                 force_delete: (G.currentPage === 'trash' || isPermanent)
-            }, 'POST', false) // `false` để không tự động hiện toast lỗi
+            }, 'POST', false)
             .catch(error => {
-                // 3. Nếu API thất bại, khôi phục lại UI
                 showToast(`Failed to delete items: ${error.message}. Restoring view.`, 'danger');
-                // Cách đơn giản nhất để khôi phục là tải lại view
                 navigateToPath(window.location.search, true);
             });
     });
+}
+
+function batchDeleteSelectedWrapper(isPermanent, id) {
+    $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
+    const itemElement = $(`.selectable[data-id="${id}"]`);
+    if (itemElement) {
+        itemElement.classList.add('selected');
+        batchDeleteSelected(isPermanent);
+    }
 }
 
 async function batchRestoreSelected() {
@@ -2475,16 +2447,6 @@ function batchDownloadSelected() {
     document.body.removeChild(form);
 }
 
-function batchDeleteSelectedWrapper(isPermanent, id) {
-    // Tái sử dụng logic của batchDeleteSelected bằng cách giả lập việc chọn item
-    $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
-    const itemElement = $(`.selectable[data-id="${id}"]`);
-    if (itemElement) {
-        itemElement.classList.add('selected');
-        batchDeleteSelected(isPermanent);
-    }
-}
-
 function batchRestoreSelectedWrapper(id) {
     showConfirmModal('Confirm Restore', 'Are you sure you want to restore this item?', async () => {
         const result = await apiCall('restore', {
@@ -2536,8 +2498,7 @@ async function performLiveSearch(query) {
         return;
     }
     resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML =
-        '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    resultsContainer.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
     const result = await apiCall('live_search', {
         q: query
     });
@@ -2680,74 +2641,77 @@ function openRenameModal(id, oldName, type) {
     input.focus();
     input.select();
 }
-// --- THAY THẾ CÁC HÀM CŨ BẰNG CÁC HÀM MỚI NÀY ---
+async function openPreviewModal(name, id) {
+    const modal = $('#previewModal');
+    const modalContent = modal.querySelector('.modal-content');
+    openModal('previewModal');
 
-/**
- * Mở modal chia sẻ, lấy thông tin hiện tại của link và điền vào form
- */
-async function openShareModal(fileId) {
-    openModal('shareModal');
-    $('#shareFileId').value = fileId;
+    const title = $('#previewModalTitle');
+    const content = $('#previewContent');
+    title.textContent = name;
+    content.innerHTML =
+        '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
 
-    const linkSection = $('#share-link-section');
-    const createSection = $('#create-share-link-section');
-    const optionsSection = $('#share-options-section');
-    const removeBtn = $('#removeShareLinkBtn');
-    const saveBtn = $('#saveShareSettingsBtn');
-    const linkInput = $('#shareLinkInput');
+    // Luôn reset kích thước modal về mặc định khi mở
+    modalContent.classList.remove('modal-content-fullscreen');
 
-    // Reset and show loading state
-    linkSection.style.display = 'none';
-    createSection.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
-    optionsSection.style.display = 'none';
-    removeBtn.style.display = 'none';
-    saveBtn.textContent = 'Save & Create Link';
-    $('#share-modal-body').querySelectorAll('input').forEach(i => {
-        if (i.type === 'checkbox') i.checked = true;
-        else if (i.type !== 'hidden') i.value = '';
+    const d = await apiCall('get_preview_data', {
+        id: id
     });
 
-    const result = await apiCall('get_share_details', {
-        file_id: fileId
-    });
+    if (!d.success) {
+        content.innerHTML = `<p style="padding:20px;">${d.message}</p>`;
+        return;
+    }
 
-    if (result.success && result.details) {
-        // Link đã tồn tại
-        linkSection.style.display = 'block';
-        createSection.style.display = 'none';
-        optionsSection.style.display = 'block';
-        removeBtn.style.display = 'block';
-        saveBtn.textContent = 'Update Settings';
+    let html = '';
+    switch (d.type) {
+        case 'image':
+            html = `<img src="${d.data}" alt="${name}">`;
+            break;
+        case 'video':
+            html =
+                `<video id="media-player" playsinline controls><source src="${d.data}" type="${d.mime_type}"></video>`;
+            break;
+        case 'audio':
+            html = `<audio id="media-player" controls><source src="${d.data}" type="${d.mime_type}"></audio>`;
+            break;
+        case 'pdf':
+            // Thêm class để phóng to modal
+            modalContent.classList.add('modal-content-fullscreen');
+            // Thêm hash parameter để PDF tự động zoom-to-width
+            html = `<iframe src="${d.data}#view=fitH" style="width: 100%; height: 100%; border: none;"></iframe>`;
+            break;
+        case 'code':
+            html =
+                `<pre class="line-numbers" style="width:100%;height:100%;margin:0;max-height:calc(90vh - 55px);"><code class="language-${d.language}">${escapeHtml(d.data)}</code></pre>`;
+            break;
+        default:
+            html =
+                `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-file fa-3x" style="margin-bottom: 15px;"></i><p>No preview available for <strong>${escapeHtml(d.data.name)}</strong>.</p><p>Size: ${d.data.size}</p></div>`;
+            break;
+    }
+    content.innerHTML = html;
 
-        linkInput.value = `${G.BASE_URL}share.php?id=${result.details.id}`;
-        $('#sharePassword').placeholder = result.details.has_password ?
-            'Password is set. Enter new to change.' : 'Protect with a password';
-        $('#shareExpiry').value = result.details.expires_at ? result.details.expires_at.split(' ')[0] : '';
-        $('#shareAllowDownload').checked = result.details.allow_download == 1;
-    } else {
-        // Link chưa tồn tại
-        createSection.innerHTML = '<p>This file is not currently shared.</p>';
-        createSection.style.display = 'block';
-        optionsSection.style.display = 'block'; // Vẫn hiện option để tạo link mới
+    if (d.type === 'video' || d.type === 'audio') {
+        G.plyrInstance = new Plyr('#media-player', {
+            autoplay: true
+        });
+    } else if (d.type === 'code') {
+        Prism.highlightAllUnder(content);
     }
 }
-
-/**
- * Lưu các cài đặt chia sẻ
- */
 async function saveShareSettings() {
     const fileId = $('#shareFileId').value;
     const password = $('#sharePassword').value;
     const expires_at = $('#shareExpiry').value;
     const allow_download = $('#shareAllowDownload').checked ? 1 : 0;
-
     const data = {
         file_id: fileId,
         allow_download: allow_download
     };
     if (password) data.password = password;
     if (expires_at) data.expires_at = expires_at;
-
     const result = await apiCall('update_share_link', data);
     if (result.success) {
         showToast('Share settings saved!');
@@ -2756,15 +2720,11 @@ async function saveShareSettings() {
         $('#create-share-link-section').style.display = 'none';
         $('#removeShareLinkBtn').style.display = 'block';
         $('#saveShareSettingsBtn').textContent = 'Update Settings';
-        $('#sharePassword').value = ''; // Xóa trường pass sau khi lưu
+        $('#sharePassword').value = '';
         $('#sharePassword').placeholder = password ? 'Password is set. Enter new to change.' :
             'Protect with a password';
     }
 }
-
-/**
- * Xóa link chia sẻ
- */
 async function removeShareLink() {
     const fileId = $('#shareFileId').value;
     showConfirmModal('Remove Share Link',
@@ -2785,6 +2745,69 @@ function copyShareLink() {
     input.select();
     document.execCommand('copy');
     showToast('Link copied to clipboard!', 'info');
+}
+async function openPreviewModal(name, id) {
+    const modal = $('#previewModal');
+    const modalContent = modal.querySelector('.modal-content');
+    openModal('previewModal');
+
+    const title = $('#previewModalTitle');
+    const content = $('#previewContent');
+    title.textContent = name;
+    content.innerHTML =
+        '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+
+    // Reset kích thước modal về mặc định
+    modalContent.classList.remove('modal-content-fullscreen');
+
+    const d = await apiCall('get_preview_data', {
+        id: id
+    });
+
+    if (!d.success) {
+        content.innerHTML = `<p style="padding:20px;">${d.message}</p>`;
+        return;
+    }
+
+    let html = '';
+    switch (d.type) {
+        case 'image':
+            html = `<img src="${d.data}" alt="${name}">`;
+            break;
+        case 'video':
+            html =
+                `<video id="media-player" playsinline controls><source src="${d.data}" type="${d.mime_type}"></video>`;
+            break;
+        case 'audio':
+            html = `<audio id="media-player" controls><source src="${d.data}" type="${d.mime_type}"></audio>`;
+            break;
+
+            // *** NÂNG CẤP Ở ĐÂY ***
+        case 'pdf':
+            // 1. Thêm class để phóng to modal
+            modalContent.classList.add('modal-content-fullscreen');
+            // 2. Thêm hash parameter để PDF tự động zoom-to-width
+            html = `<iframe src="${d.data}#view=fitH" style="width: 100%; height: 100%; border: none;"></iframe>`;
+            break;
+
+        case 'code':
+            html =
+                `<pre class="line-numbers" style="width:100%;height:100%;margin:0;max-height:calc(90vh - 55px);"><code class="language-${d.language}">${escapeHtml(d.data)}</code></pre>`;
+            break;
+        default:
+            html =
+                `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-file fa-3x" style="margin-bottom: 15px;"></i><p>No preview available for <strong>${escapeHtml(d.data.name)}</strong>.</p><p>Size: ${d.data.size}</p></div>`;
+            break;
+    }
+    content.innerHTML = html;
+
+    if (d.type === 'video' || d.type === 'audio') {
+        G.plyrInstance = new Plyr('#media-player', {
+            autoplay: true
+        });
+    } else if (d.type === 'code') {
+        Prism.highlightAllUnder(content);
+    }
 }
 
 function toggleSelectAll(isChecked) {
@@ -2910,8 +2933,7 @@ async function uploadFile(file) {
         status.textContent = 'Complete!';
         icon.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success-color)"></i>`;
         setTimeout(() => {
-            if ($('#uploadModal').classList.contains('show')) navigateToPath(window.location.search,
-                true);
+            if ($('#uploadModal').classList.contains('show')) navigateToPath(window.location.search, true);
         }, 1200);
     } else {
         status.textContent = 'Finalization failed: ' + completeResult.message;
@@ -2999,36 +3021,9 @@ function formatBytesJS(bytes, decimals = 2) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
-async function renderPdf(url) {
-    const {
-        pdfjsLib
-    } = globalThis;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `./src/js/pdf.worker.mjs`;
-    const pdfDoc = await pdfjsLib.getDocument(url).promise;
-    const viewer = $('#pdf-viewer-container');
-    viewer.innerHTML = '';
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-        const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({
-            scale: 1.5
-        });
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        canvas.style.marginBottom = '10px';
-        viewer.appendChild(canvas);
-        await page.render({
-            canvasContext: context,
-            viewport: viewport
-        }).promise;
-    }
-}
 
 document.addEventListener('DOMContentLoaded', () => {
-    const sessionMessage = <?php echo !empty($session_message)
-        ? $session_message
-        : "null"; ?>;
+    const sessionMessage = <?php echo !empty($session_message) ? $session_message : 'null'; ?>;
     if (sessionMessage) {
         showToast(sessionMessage.text, sessionMessage.type);
     }
@@ -3099,9 +3094,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentArea = $('.content-area');
     mainContentArea.addEventListener('click', (e) => {
         const item = e.target.closest('.selectable');
-        if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay') || (e
-                .target.closest('.grid-item') && e.target.closest('.grid-item').getAttribute(
-                    'onclick'))) return;
+        if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay') || (e.target
+                .closest('.grid-item') && e.target.closest('.grid-item').getAttribute('onclick')))
+            return;
         if (!e.ctrlKey && !e.shiftKey) {
             $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
         }
@@ -3161,8 +3156,8 @@ document.addEventListener('DOMContentLoaded', () => {
     $$('.tab-nav-item').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabContainer = tab.closest('.modal-body');
-            tabContainer.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el
-                .classList.remove('active'));
+            tabContainer.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el.classList
+                .remove('active'));
             tab.classList.add('active');
             $('#tab-' + tab.dataset.tab).classList.add('active');
         });

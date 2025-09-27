@@ -1,7 +1,101 @@
 # Nexus Drive
 
-![Nexus Drive Screenshot](./Screenshot.png)
-*Giao diện chính của Nexus Drive*
+![Nexus Drive Screenshot](./Screenshot.png)  
+*Main interface of Nexus Drive*
+
+## Introduction
+
+**Nexus Drive** is a powerful, modern, and extremely lightweight self-hosted cloud storage solution. Built with PHP and SQLite, Nexus Drive delivers a smooth user experience comparable to top services, all packaged in a simple, portable, and easy-to-deploy architecture.
+
+It’s the perfect solution for those who want full control of their data, with a beautiful interface and professional features without the complexity of heavy systems.
+
+## Why Choose Nexus Drive?
+
+*   **Superior User Experience:** The **Single Page Application (SPA)** architecture ensures instant navigation and file management without page reloads.  
+*   **High Performance:** Optimized from backend to frontend—**Gzip compression**, **streaming responses** for maximum download speeds, and an **Optimistic UI** for instant feedback.  
+*   **Absolute Portability:** The entire app, including database and file contents, is contained in a single folder. Backup, migrate, or deploy simply by copy-and-paste.  
+*   **Zero Setup:** No complicated installation required. Just upload, grant permissions, and access. The app auto-initializes everything needed.  
+
+## Feature List
+
+### Management & Interaction
+*   ✅ Modern, responsive SPA interface with **Light/Dark mode**.  
+*   ✅ Two viewing modes: **List** and **Grid**.  
+*   ✅ File/Folder management: Create, Rename, Delete, Restore.  
+*   ✅ Move files/folders anywhere via **Tree Modal** or **Drag & Drop**.  
+*   ✅ **Recycle Bin** with restore or permanent delete.  
+*   ✅ Batch download as **ZIP**.  
+
+### Performance & Large Files
+*   ✅ **Chunk Uploading:** Stable upload for very large files.  
+*   ✅ **Streamed Downloads:** Download large files instantly with minimal server memory usage.  
+*   ✅ **Gzip optimization:** Reduce transfer size, boost speed on slow networks.  
+
+### Utilities & Sharing
+*   ✅ **Versatile file preview:** Images, videos, audio, PDFs, and source code.  
+*   ✅ **Smart search:** Live search and full-page search.  
+*   ✅ **Advanced sharing:**  
+    *   Set **passwords** for shared links.  
+    *   Configure **expiration dates**.  
+    *   Allow/deny **downloads**.  
+*   ✅ **Flexible account system** with optional registration.  
+*   ✅ **Developer mode:** Disable authentication entirely for localhost development.  
+
+## Requirements
+
+*   Web server (Apache with `mod_rewrite`, or Nginx recommended).  
+*   PHP 8.0 or higher.  
+*   **PHP Extensions:**  
+    *   `pdo_sqlite` (required).  
+    *   `zip` (required).  
+
+## Quick Setup
+
+1.  **Download source code:** Get and extract the project.  
+2.  **Upload to server:** Place extracted files in your web root.  
+3.  **Grant write permissions:** Ensure project root and `database/` are writable by the web server user.  
+    *   *On Linux:* `chmod -R 775 /path/to/nexus-drive` and `chown -R www-data:www-data /path/to/nexus-drive`.  
+4.  **Access:** Open your browser and visit your URL. The app auto-creates database, user file, and brings you to login page.  
+
+**Default Account:**  
+*   **Username:** `admin`  
+*   **Password:** `admin`  
+
+## Configuration
+
+Edit `bootstrap.php` to adjust main settings:  
+
+*   `define('APP_NAME', 'Nexus Drive');`: Set app name.  
+*   `define('AUTH_ENABLED', true);`:  
+    *   `true`: Enable login system (production).  
+    *   `false`: Disable login (for localhost dev).  
+*   `define('ALLOW_REGISTRATION', false);`:  
+    *   `true`: Allow user self-registration.  
+    *   `false`: Disable public registration.  
+
+## Project Structure
+
+*   `index.php`: Main view & client-side JavaScript.  
+*   `api.php`: API gateway handling business logic.  
+*   `bootstrap.php`: Core config, utilities, and authentication check.  
+*   `share.php`: Public view for shared links.  
+*   `login.php`, `register.php`, `logout.php`: Auth pages.  
+*   `database/database.sqlite`: SQLite database file.  
+*   `users.php`: User data storage file.  
+*   `.htaccess`: Apache server configuration.  
+*   `src/`: Assets (CSS, JS libraries, fonts, images).  
+
+## License
+
+This project is released under the [MIT License](LICENSE).  
+
+---
+
+# Bản gốc tiếng Việt
+
+(Đã lược bỏ phần so sánh với Tiny File Manager)
+
+# Vietnamese
 
 ## Giới thiệu
 
@@ -85,18 +179,6 @@ Mở tệp `bootstrap.php` để tùy chỉnh các cài đặt chính:
 *   `.htaccess`: Cấu hình cho máy chủ Apache.
 *   `src/`: Thư mục chứa các tài nguyên như CSS, JS libraries, fonts, images.
 
-## So sánh với Tiny File Manager
-
-|                  | Nexus Drive                                                   | Tiny File Manager                                      |
-| :--------------- | :------------------------------------------------------------ | :----------------------------------------------------- |
-| **Triết lý**     | **Lưu trữ đám mây cá nhân** (như Google Drive)                | **Trình quản lý tệp server** (như cPanel)              |
-| **Trải nghiệm**  | **SPA, hiện đại, mượt mà**                                    | MPA, truyền thống, chức năng                           |
-| **Lưu trữ file** | Trong **CSDL SQLite (BLOB)**                                  | Trực tiếp trên **hệ thống file**                       |
-| **Điểm mạnh**    | UX, tính di động, xử lý file lớn, an toàn cho người dùng cuối | Công cụ cho dev (editor, terminal), quản lý quyền file |
-|                  |                                                               |                                                        |
-
 ## Giấy phép
 
-Dự án này được phát hành dưới [Giấy phép MIT](LICENSE).
-
----
+Dự án này được phát hành dưới [Giấy phép MIT](LICENSE).  

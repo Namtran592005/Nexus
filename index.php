@@ -1942,12 +1942,12 @@ $_COOKIE["theme"] === "light"
                                     <a href="https://tranvohoangnam.id.vn/portfolio" target="_blank">
                                         <i class="fas fa-globe"></i> Portfolio
                                     </a>
-                                    <a href="https://www.facebook.com/namtran5905" target="_blank">
+                                    <!-- <a href="https://www.facebook.com/namtran5905" target="_blank">
                                         <i class="fab fa-facebook"></i> Facebook
                                     </a>
                                     <a href="https://www.instagram.com/namtran5905/" target="_blank">
                                         <i class="fab fa-instagram"></i> Instagram
-                                    </a>
+                                    </a> -->
                                 </div>
                             </div>
                         </div>

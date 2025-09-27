@@ -23,6 +23,26 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 $action = $input["action"] ?? ($_GET["action"] ?? ($_POST["action"] ?? null));
 
+// Hàm đệ quy để xây dựng cây thư mục
+function buildFolderTree($pdo, $parentId, $excludeIds = [])
+{
+    $stmt = $pdo->prepare(
+        "SELECT id, name FROM file_system WHERE parent_id = ? AND type = 'folder' AND is_deleted = 0 ORDER BY name ASC"
+    );
+    $stmt->execute([$parentId]);
+    $folders = [];
+    while ($folder = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        // Loại bỏ các thư mục đang được chọn di chuyển để tránh di chuyển vào chính nó
+        if (in_array($folder["id"], $excludeIds)) {
+            continue;
+        }
+        $children = buildFolderTree($pdo, $folder["id"], $excludeIds);
+        $folder["children"] = $children;
+        $folders[] = $folder;
+    }
+    return $folders;
+}
+
 try {
     switch ($action) {
         // --- CÁC ACTION CŨ VẪN GIỮ NGUYÊN ---
@@ -30,93 +50,130 @@ try {
 
         // --- ACTION MỚI: LẤY DỮ LIỆU CHO CÁC VIEW ---
         // THAY THẾ TOÀN BỘ CASE 'get_view_data' BẰNG PHIÊN BẢN NÀY
-        case 'get_view_data':
+        case "get_folder_tree":
+            $excludeIds = isset($input["exclude_ids"])
+                ? (array) $input["exclude_ids"]
+                : [];
+            $folderTree = buildFolderTree($pdo, ROOT_FOLDER_ID, $excludeIds);
+            // Thêm thư mục gốc vào đầu
+            array_unshift($folderTree, [
+                "id" => ROOT_FOLDER_ID,
+                "name" => "Drive (Root)",
+                "children" => [],
+            ]);
+            $response = ["success" => true, "tree" => $folderTree];
+            break;
+
+        case "get_view_data":
             // Luôn đọc từ $_GET cho action này
-            $view = $_GET['view'] ?? 'browse';
-            $path = $_GET['path'] ?? '';
-            $searchTerm = $_GET['q'] ?? '';
+            $view = $_GET["view"] ?? "browse";
+            $path = $_GET["path"] ?? "";
+            $searchTerm = $_GET["q"] ?? "";
 
             $items = [];
             $currentFolderId = ROOT_FOLDER_ID;
             $pageTitle = ucfirst($view);
 
-            if ($view === 'browse') {
+            if ($view === "browse") {
                 if (!empty($path)) {
                     $currentFolderId = getItemIdByPath($pdo, $path);
                     if ($currentFolderId === null) {
-                        throw new Exception('Invalid path specified.');
+                        throw new Exception("Invalid path specified.");
                     }
                 }
-                $stmt = $pdo->prepare("SELECT id, name, type, size, modified_at AS modified FROM file_system WHERE parent_id = ? AND is_deleted = 0");
+                $stmt = $pdo->prepare(
+                    "SELECT id, name, type, size, modified_at AS modified FROM file_system WHERE parent_id = ? AND is_deleted = 0"
+                );
                 $stmt->execute([$currentFolderId]);
                 $items = $stmt->fetchAll();
-            } elseif ($view === 'recents') {
-                $stmt = $pdo->query("SELECT id, name, type, size, modified_at AS modified FROM file_system WHERE type = 'file' AND is_deleted = 0 ORDER BY modified_at DESC LIMIT 50");
+            } elseif ($view === "recents") {
+                $stmt = $pdo->query(
+                    "SELECT id, name, type, size, modified_at AS modified FROM file_system WHERE type = 'file' AND is_deleted = 0 ORDER BY modified_at DESC LIMIT 50"
+                );
                 $items = $stmt->fetchAll();
-            } elseif ($view === 'shared') {
-                $stmt = $pdo->query("SELECT fs.id, fs.name, fs.type, fs.size, fs.modified_at AS modified, sl.id AS share_id FROM file_system fs JOIN share_links sl ON fs.id = sl.file_id WHERE fs.is_deleted = 0 ORDER BY fs.name ASC");
+            } elseif ($view === "shared") {
+                $stmt = $pdo->query(
+                    "SELECT fs.id, fs.name, fs.type, fs.size, fs.modified_at AS modified, sl.id AS share_id FROM file_system fs JOIN share_links sl ON fs.id = sl.file_id WHERE fs.is_deleted = 0 ORDER BY fs.name ASC"
+                );
                 $items = $stmt->fetchAll();
-            } elseif ($view === 'trash') {
-                $stmt = $pdo->query("SELECT id, name, type, size, deleted_at AS modified FROM file_system WHERE is_deleted = 1 ORDER BY deleted_at DESC");
+            } elseif ($view === "trash") {
+                $stmt = $pdo->query(
+                    "SELECT id, name, type, size, deleted_at AS modified FROM file_system WHERE is_deleted = 1 ORDER BY deleted_at DESC"
+                );
                 $items = $stmt->fetchAll();
-            } elseif ($view === 'search') {
-                $pageTitle = 'Search Results';
+            } elseif ($view === "search") {
+                $pageTitle = "Search Results";
                 if (!empty($searchTerm)) {
-                    $stmt = $pdo->prepare("SELECT id, name, type, size, modified_at AS modified, parent_id FROM file_system WHERE name LIKE ? AND is_deleted = 0 ORDER BY type, name");
-                    $stmt->execute(['%' . $searchTerm . '%']);
+                    $stmt = $pdo->prepare(
+                        "SELECT id, name, type, size, modified_at AS modified, parent_id FROM file_system WHERE name LIKE ? AND is_deleted = 0 ORDER BY type, name"
+                    );
+                    $stmt->execute(["%" . $searchTerm . "%"]);
                     $items = $stmt->fetchAll();
                 }
             }
 
             foreach ($items as &$item) {
-                if ($view === 'browse' && $item['type'] === 'folder') {
-                    $item['relative_path'] = !empty($path) ? $path . '/' . $item['name'] : $item['name'];
+                if ($view === "browse" && $item["type"] === "folder") {
+                    $item["relative_path"] = !empty($path)
+                        ? $path . "/" . $item["name"]
+                        : $item["name"];
                 }
-                if ($view === 'search') {
-                    $item['full_path'] = getPathByItemId($pdo, $item['parent_id']);
+                if ($view === "search") {
+                    $item["full_path"] = getPathByItemId(
+                        $pdo,
+                        $item["parent_id"]
+                    );
                 }
-                $item['modified'] = strtotime($item['modified']);
+                $item["modified"] = strtotime($item["modified"]);
             }
             unset($item);
 
             usort($items, function ($a, $b) {
-                if ($a['type'] !== $b['type']) return ($a['type'] === 'folder') ? -1 : 1;
-                return strcasecmp($a['name'], $b['name']);
+                if ($a["type"] !== $b["type"]) {
+                    return $a["type"] === "folder" ? -1 : 1;
+                }
+                return strcasecmp($a["name"], $b["name"]);
             });
 
             $breadcrumbs = [];
             $parentPath = null;
-            if ($view === 'browse') {
-                $breadcrumbs[] = ['name' => 'Drive', 'path' => ''];
+            if ($view === "browse") {
+                $breadcrumbs[] = ["name" => "Drive", "path" => ""];
                 if (!empty($path)) {
-                    $pathParts = explode('/', $path);
-                    $accumulatedPath = '';
+                    $pathParts = explode("/", $path);
+                    $accumulatedPath = "";
                     foreach ($pathParts as $part) {
                         if (!empty($part)) {
-                            $accumulatedPath .= (empty($accumulatedPath) ? '' : '/') . $part;
-                            $breadcrumbs[] = ['name' => $part, 'path' => $accumulatedPath];
+                            $accumulatedPath .=
+                                (empty($accumulatedPath) ? "" : "/") . $part;
+                            $breadcrumbs[] = [
+                                "name" => $part,
+                                "path" => $accumulatedPath,
+                            ];
                         }
                     }
                 }
                 if ($currentFolderId != ROOT_FOLDER_ID) {
-                    $parentStmt = $pdo->prepare("SELECT parent_id FROM file_system WHERE id = ?");
+                    $parentStmt = $pdo->prepare(
+                        "SELECT parent_id FROM file_system WHERE id = ?"
+                    );
                     $parentStmt->execute([$currentFolderId]);
                     $parentOfCurrentId = $parentStmt->fetchColumn();
                     if ($parentOfCurrentId) {
-                         $parentPath = getPathByItemId($pdo, $parentOfCurrentId);
+                        $parentPath = getPathByItemId($pdo, $parentOfCurrentId);
                     }
                 }
             }
-            
+
             $response = [
-                'success' => true,
-                'view' => $view,
-                'pageTitle' => $pageTitle,
-                'items' => $items,
-                'breadcrumbs' => $breadcrumbs,
-                'currentFolderId' => $currentFolderId,
-                'currentPath' => $path,
-                'parentPath' => $parentPath
+                "success" => true,
+                "view" => $view,
+                "pageTitle" => $pageTitle,
+                "items" => $items,
+                "breadcrumbs" => $breadcrumbs,
+                "currentFolderId" => $currentFolderId,
+                "currentPath" => $path,
+                "parentPath" => $parentPath,
             ];
             break;
 
@@ -282,7 +339,88 @@ try {
                 "message" => "Trash has been emptied.",
             ];
             break;
+        // --- NÂNG CẤP ACTION 'move' ---
         case "move":
+            // Chấp nhận một mảng các itemIds
+            $itemIds = (array) ($input["item_ids"] ?? []);
+            $destinationId = (int) ($input["destination_id"] ?? 0);
+
+            if (empty($itemIds)) {
+                throw new Exception("No items selected to move.");
+            }
+
+            $pdo->beginTransaction();
+
+            foreach ($itemIds as $itemId) {
+                $itemId = (int) $itemId;
+                if ($itemId === 0) {
+                    continue;
+                }
+
+                $stmt = $pdo->prepare(
+                    "SELECT name, type, parent_id FROM file_system WHERE id = ?"
+                );
+                $stmt->execute([$itemId]);
+                $item = $stmt->fetch();
+                if (!$item) {
+                    continue;
+                } // Bỏ qua nếu không tìm thấy
+
+                if ($itemId === $destinationId) {
+                    throw new Exception("Cannot move an item into itself.");
+                }
+                if ($item["parent_id"] === $destinationId) {
+                    continue;
+                } // Bỏ qua nếu đã ở đúng vị trí
+
+                // Kiểm tra di chuyển thư mục vào thư mục con của nó
+                if ($item["type"] === "folder") {
+                    $currentParent = $destinationId;
+                    while (
+                        $currentParent != ROOT_FOLDER_ID &&
+                        $currentParent != null
+                    ) {
+                        if ($currentParent == $itemId) {
+                            throw new Exception(
+                                "Cannot move a folder into one of its own subfolders."
+                            );
+                        }
+                        $stmt = $pdo->prepare(
+                            "SELECT parent_id FROM file_system WHERE id = ?"
+                        );
+                        $stmt->execute([$currentParent]);
+                        $currentParent = $stmt->fetchColumn();
+                    }
+                }
+
+                // Kiểm tra tên trùng lặp
+                $stmt = $pdo->prepare(
+                    "SELECT id FROM file_system WHERE name = ? AND parent_id = ? AND is_deleted = 0"
+                );
+                $stmt->execute([$item["name"], $destinationId]);
+                if ($stmt->fetch()) {
+                    // Nếu có thể, bạn có thể thêm logic đổi tên tự động ở đây
+                    // ví dụ: 'file_copy.txt'
+                    throw new Exception(
+                        'An item named "' .
+                            htmlspecialchars($item["name"]) .
+                            '" already exists in the destination.'
+                    );
+                }
+
+                $stmt = $pdo->prepare(
+                    "UPDATE file_system SET parent_id = ? WHERE id = ?"
+                );
+                $stmt->execute([$destinationId, $itemId]);
+            }
+
+            $pdo->commit();
+
+            $response = [
+                "success" => true,
+                "message" => count($itemIds) . " item(s) moved successfully.",
+            ];
+            break;
             // ... code giữ nguyên ...
             $itemId = (int) ($input["item_id"] ?? 0);
             $destinationId = (int) ($input["destination_id"] ?? 0);
@@ -573,7 +711,95 @@ try {
                 ];
             }
             break;
-        case "create_share_link":
+        case "get_share_details":
+            $file_id = (int) ($input["file_id"] ?? 0);
+            if ($file_id <= 0) {
+                throw new Exception("Invalid file ID.");
+            }
+
+            $stmt = $pdo->prepare(
+                "SELECT id, password, expires_at, allow_download FROM share_links WHERE file_id = ?"
+            );
+            $stmt->execute([$file_id]);
+            $details = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Không trả về hash mật khẩu, chỉ cần cho biết nó có tồn tại hay không
+            if ($details) {
+                $details["has_password"] = !empty($details["password"]);
+                unset($details["password"]);
+            }
+
+            $response = ["success" => true, "details" => $details];
+            break;
+
+        case "update_share_link":
+            $file_id = (int) ($input["file_id"] ?? 0);
+            if ($file_id <= 0) {
+                throw new Exception("Invalid file ID.");
+            }
+
+            $password = $input["password"] ?? null;
+            $expires_at = $input["expires_at"] ?? null;
+            $allow_download = isset($input["allow_download"])
+                ? (int) $input["allow_download"]
+                : 1;
+
+            $hashed_password = null;
+            if (!empty($password)) {
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            }
+
+            // Kiểm tra link đã tồn tại chưa
+            $stmt = $pdo->prepare(
+                "SELECT id FROM share_links WHERE file_id = ?"
+            );
+            $stmt->execute([$file_id]);
+            $existing_link = $stmt->fetch();
+
+            if ($existing_link) {
+                // Cập nhật link hiện có
+                $shareId = $existing_link["id"];
+                $stmt = $pdo->prepare(
+                    "UPDATE share_links SET password = ?, expires_at = ?, allow_download = ? WHERE file_id = ?"
+                );
+                $stmt->execute([
+                    $hashed_password,
+                    $expires_at,
+                    $allow_download,
+                    $file_id,
+                ]);
+            } else {
+                // Tạo link mới
+                $shareId = bin2hex(random_bytes(8));
+                $stmt = $pdo->prepare(
+                    "INSERT INTO share_links (id, file_id, password, expires_at, allow_download) VALUES (?, ?, ?, ?, ?)"
+                );
+                $stmt->execute([
+                    $shareId,
+                    $file_id,
+                    $hashed_password,
+                    $expires_at,
+                    $allow_download,
+                ]);
+            }
+            $response = [
+                "success" => true,
+                "message" => "Share settings updated.",
+                "share_id" => $shareId,
+            ];
+            break;
+
+        case "remove_share_link":
+            $file_id = (int) ($input["file_id"] ?? 0);
+            if ($file_id <= 0) {
+                throw new Exception("Invalid file ID.");
+            }
+
+            $stmt = $pdo->prepare("DELETE FROM share_links WHERE file_id = ?");
+            $stmt->execute([$file_id]);
+
+            $response = ["success" => true, "message" => "Share link removed."];
+            break;
             // ... code giữ nguyên ...
             $file_id = (int) ($input["file_id"] ?? 0);
             if ($file_id <= 0) {
@@ -595,48 +821,77 @@ try {
             }
             break;
 
-        // --- ACTION MỚI: TẢI FILE (từ download.php) ---
+        // --- NÂNG CẤP ACTION: TẢI FILE (từ download.php) VỚI STREAMING ---
         case "download_file":
-            $id = (int) ($_GET["id"] ?? 0);
-            $stmt = $pdo->prepare(
-                "SELECT name, mime_type, size, content FROM file_system WHERE id = ? AND is_deleted = 0 AND type = 'file'"
-            );
-            $stmt->execute([$id]);
-            $file = $stmt->fetch();
-
-            if ($file) {
-                header("Content-Description: File Transfer");
-                if (isset($_GET["inline"]) && $_GET["inline"] === "true") {
-                    header(
-                        'Content-Disposition: inline; filename="' .
-                            basename($file["name"]) .
-                            '"'
-                    );
-                } else {
-                    header(
-                        'Content-Disposition: attachment; filename="' .
-                            basename($file["name"]) .
-                            '"'
-                    );
-                }
-                header(
-                    "Content-Type: " .
-                        ($file["mime_type"] ?: "application/octet-stream")
-                );
-                header("Expires: 0");
-                header("Cache-Control: must-revalidate");
-                header("Pragma: public");
-                header("Content-Length: " . $file["size"]);
-
-                ob_clean();
-                flush();
-                echo $file["content"];
-                exit(); // Quan trọng: Dừng script sau khi gửi file
+            // Tắt bộ đệm đầu ra của PHP và Gzip để kiểm soát hoàn toàn việc gửi dữ liệu
+            if (ob_get_level()) {
+                ob_end_clean();
             }
 
-            http_response_code(404);
-            echo "File not found or inaccessible.";
-            exit();
+            $id = (int) ($_GET["id"] ?? 0);
+
+            // Chỉ lấy metadata trước
+            $meta_stmt = $pdo->prepare(
+                "SELECT name, mime_type, size FROM file_system WHERE id = ? AND is_deleted = 0 AND type = 'file'"
+            );
+            $meta_stmt->execute([$id]);
+            $file = $meta_stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$file) {
+                http_response_code(404);
+                die("File not found or inaccessible.");
+            }
+
+            // Gửi các header cần thiết cho trình duyệt
+            header("Content-Description: File Transfer");
+            if (isset($_GET["inline"]) && $_GET["inline"] === "true") {
+                header(
+                    'Content-Disposition: inline; filename="' .
+                        basename($file["name"]) .
+                        '"'
+                );
+            } else {
+                header(
+                    'Content-Disposition: attachment; filename="' .
+                        basename($file["name"]) .
+                        '"'
+                );
+            }
+            header(
+                "Content-Type: " .
+                    ($file["mime_type"] ?: "application/octet-stream")
+            );
+            header("Content-Length: " . $file["size"]);
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate");
+            header("Pragma: public");
+
+            // Đảm bảo tất cả header đã được gửi đi
+            flush();
+
+            // Bây giờ, chuẩn bị để stream nội dung BLOB
+            $pdo->beginTransaction();
+            $stream_stmt = $pdo->prepare(
+                "SELECT content FROM file_system WHERE id = ?"
+            );
+            $stream_stmt->bindValue(1, $id, PDO::PARAM_INT);
+            $stream_stmt->execute();
+
+            // Liên kết cột 'content' với một biến stream
+            $stream_stmt->bindColumn("content", $stream, PDO::PARAM_LOB);
+            $stream_stmt->fetch(PDO::FETCH_BOUND);
+
+            if ($stream) {
+                // Đọc và gửi stream theo từng đoạn 8KB
+                while (!feof($stream)) {
+                    echo fread($stream, 8192);
+                    flush(); // Gửi ngay đoạn vừa đọc đến trình duyệt
+                }
+                fclose($stream);
+            }
+
+            $pdo->commit();
+            exit(); // Kết thúc script
 
         // --- ACTION MỚI: TẢI ARCHIVE (từ create_archive.php) ---
         case "download_archive":

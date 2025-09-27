@@ -1,33 +1,47 @@
 <?php
-require_once 'bootstrap.php'; // Chỉ cần gọi bootstrap là đủ
+require_once "bootstrap.php"; // Chỉ cần gọi bootstrap là đủ
 
 // Lấy thông tin chung không đổi
-$totalSize = $pdo->query("SELECT SUM(size) FROM file_system WHERE is_deleted = 0 AND type = 'file'")->fetchColumn() ?: 0;
+$totalSize =
+    $pdo
+        ->query(
+            "SELECT SUM(size) FROM file_system WHERE is_deleted = 0 AND type = 'file'"
+        )
+        ->fetchColumn() ?:
+    0;
 $totalStorageBytes = TOTAL_STORAGE_GB * 1024 * 1024 * 1024;
-$usagePercentage = ($totalStorageBytes > 0) ? ($totalSize / $totalStorageBytes) * 100 : 0;
+$usagePercentage =
+    $totalStorageBytes > 0 ? ($totalSize / $totalStorageBytes) * 100 : 0;
 
 // Lấy dữ liệu cho biểu đồ (chỉ cần 1 lần)
-$stmt = $pdo->query("SELECT mime_type, SUM(size) as total_size FROM file_system WHERE type = 'file' AND is_deleted = 0 GROUP BY mime_type");
+$stmt = $pdo->query(
+    "SELECT mime_type, SUM(size) as total_size FROM file_system WHERE type = 'file' AND is_deleted = 0 GROUP BY mime_type"
+);
 $storageBreakdownRaw = $stmt->fetchAll();
 $storageBreakdown = [];
 foreach ($storageBreakdownRaw as $row) {
-    $category = getFileTypeCategory($row['mime_type']);
-    if (!isset($storageBreakdown[$category])) $storageBreakdown[$category] = 0;
-    $storageBreakdown[$category] += (int)$row['total_size'];
+    $category = getFileTypeCategory($row["mime_type"]);
+    if (!isset($storageBreakdown[$category])) {
+        $storageBreakdown[$category] = 0;
+    }
+    $storageBreakdown[$category] += (int) $row["total_size"];
 }
 arsort($storageBreakdown);
-$storageBreakdownForJs = ['labels' => array_keys($storageBreakdown), 'data' => array_values($storageBreakdown)];
+$storageBreakdownForJs = [
+    "labels" => array_keys($storageBreakdown),
+    "data" => array_values($storageBreakdown),
+];
 
 // Lấy thông tin view ban đầu từ URL để JS có thể tải lần đầu
-$initial_view = $_GET['view'] ?? 'browse';
-$initial_path = $_GET['path'] ?? '';
-$initial_query = $_GET['q'] ?? '';
+$initial_view = $_GET["view"] ?? "browse";
+$initial_path = $_GET["path"] ?? "";
+$initial_query = $_GET["q"] ?? "";
 
 // Lấy thông báo session
-$session_message = '';
-if (isset($_SESSION['message'])) {
-    $session_message = json_encode($_SESSION['message']);
-    unset($_SESSION['message']);
+$session_message = "";
+if (isset($_SESSION["message"])) {
+    $session_message = json_encode($_SESSION["message"]);
+    unset($_SESSION["message"]);
 }
 ?>
 <!DOCTYPE html>
@@ -870,6 +884,7 @@ if (isset($_SESSION['message'])) {
         padding: 24px;
         overflow-y: auto;
         flex-grow: 1;
+
     }
 
     .modal-body p {
@@ -1227,6 +1242,7 @@ if (isset($_SESSION['message'])) {
 
     .overlay {
         display: none;
+        /* Quan trọng */
         position: fixed;
         top: 0;
         left: 0;
@@ -1234,6 +1250,7 @@ if (isset($_SESSION['message'])) {
         height: 100%;
         background: rgba(0, 0, 0, 0.5);
         z-index: 149;
+        /* Phải thấp hơn z-index của modal */
         opacity: 0;
         transition: opacity var(--transition-speed-normal) ease;
     }
@@ -1414,10 +1431,178 @@ if (isset($_SESSION['message'])) {
         pointer-events: none;
         transition: opacity 0.2s ease;
     }
+
+    /* CSS cho Cây thư mục trong Modal Di chuyển */
+    .folder-tree ul {
+        list-style: none;
+        padding-left: 20px;
+    }
+
+    .folder-tree li {
+        padding: 5px 0;
+    }
+
+    .folder-tree .folder-item {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px;
+        border-radius: 6px;
+    }
+
+    .folder-tree .folder-item:hover {
+        background-color: var(--highlight-color);
+    }
+
+    .folder-tree .folder-item.selected {
+        background-color: var(--selection-color);
+        font-weight: 600;
+    }
+
+    .folder-tree .toggle-icon {
+        width: 16px;
+        text-align: center;
+        transition: transform 0.2s ease;
+    }
+
+    .folder-tree .toggle-icon.collapsed {
+        transform: rotate(-90deg);
+    }
+
+    /* Cải thiện giao diện cho Form trong Modal */
+    .modal .form-group {
+        margin-bottom: 15px;
+    }
+
+    .modal .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-size: 0.9em;
+    }
+
+    .modal .form-group input[type="password"],
+    .modal .form-group input[type="date"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-default);
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        font-size: 1em;
+        transition: border-color var(--transition-speed-fast);
+    }
+
+    .modal .form-group input[type="password"]:focus,
+    .modal .form-group input[type="date"]:focus {
+        outline: none;
+        border-color: var(--text-accent);
+    }
+
+    .modal .form-group-inline {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal .form-group-inline label {
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+
+    /* CSS Mới cho Tab About */
+    .about-section .app-description {
+        max-width: 450px;
+        margin: 0 auto 25px auto;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    .developer-info {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .developer-info h4 {
+        font-size: 0.9em;
+        color: var(--text-secondary);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+    }
+
+    .developer-links a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 10px;
+        color: var(--text-accent);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s ease;
+    }
+
+    .developer-links a:hover {
+        color: var(--text-primary);
+    }
+
+    /* TÙY CHỈNH THANH CUỘN CHO GIAO DIỆN */
+
+    /* Cho các trình duyệt WebKit (Chrome, Safari, Edge, Opera) */
+    ::-webkit-scrollbar {
+        width: 8px;
+        /* Chiều rộng cho thanh cuộn dọc */
+        height: 8px;
+        /* Chiều cao cho thanh cuộn ngang */
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--bg-primary);
+        /* Màu nền của rãnh cuộn */
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: var(--bg-tertiary);
+        /* Màu của con trượt */
+        border-radius: 4px;
+        /* Bo tròn góc con trượt */
+        border: 2px solid var(--bg-primary);
+        /* Tạo khoảng cách giữa con trượt và rãnh */
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--border-color);
+        /* Màu con trượt khi di chuột qua */
+    }
+
+    /* Cho Firefox */
+    /* Áp dụng cho các phần tử có thể cuộn */
+    .content-area,
+    .sidebar,
+    #details-panel-body,
+    #live-search-results,
+    .modal-body,
+    #folder-tree-container,
+    #upload-progress-list,
+    #previewContent,
+    #pdf-viewer-container {
+        scrollbar-width: thin;
+        /* 'auto', 'thin', 'none' */
+        scrollbar-color: var(--bg-tertiary) var(--bg-primary);
+        /* màu con trượt và màu rãnh */
+    }
     </style>
 </head>
 
-<body class="<?php echo isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'light' ? 'light-mode' : 'dark-mode'; ?>">
+<body class="<?php echo isset($_COOKIE["theme"]) &&
+$_COOKIE["theme"] === "light"
+    ? "light-mode"
+    : "dark-mode"; ?>">
     <div id="toast-container"></div>
     <div class="header">
         <div class="left-section">
@@ -1434,7 +1619,9 @@ if (isset($_SESSION['message'])) {
                 </form>
                 <div id="live-search-results"></div>
             </div>
-            <span class="user-info">Hi, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+            <span class="user-info">Hi, <?php echo htmlspecialchars(
+                $_SESSION["username"]
+            ); ?></span>
             <a href="logout.php" class="icon-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
             <button class="icon-btn" onclick="toggleTheme()" title="Toggle Theme"><i class="fas fa-adjust"></i></button>
             <button class="icon-btn" onclick="showUserInfoModal()" title="Information"><i
@@ -1450,8 +1637,7 @@ if (isset($_SESSION['message'])) {
             <nav class="sidebar-nav">
                 <ul>
                     <li class="sidebar-nav-item"><a href="?view=recents" data-view="recents"><i
-                                class="far fa-clock"></i>
-                            <span>Recents</span></a></li>
+                                class="far fa-clock"></i> <span>Recents</span></a></li>
                     <li class="sidebar-nav-item"><a href="?view=browse" data-view="browse"><i class="fas fa-folder"></i>
                             <span>Browse</span></a></li>
                     <li class="sidebar-nav-item"><a href="?view=shared" data-view="shared"><i class="fas fa-users"></i>
@@ -1464,7 +1650,9 @@ if (isset($_SESSION['message'])) {
                 <div class="sidebar-storage-info">
                     <div class="details">
                         <span>Storage</span>
-                        <span id="storage-usage-text"><?php echo formatBytes($totalSize); ?> of
+                        <span id="storage-usage-text"><?php echo formatBytes(
+                            $totalSize
+                        ); ?> of
                             <?php echo TOTAL_STORAGE_GB; ?> GB</span>
                     </div>
                     <div class="progress-bar">
@@ -1480,17 +1668,17 @@ if (isset($_SESSION['message'])) {
                 <h1 id="page-title">Loading...</h1>
                 <div id="page-stats" class="stats"></div>
             </div>
-
             <form action="index.php" method="GET" class="search-form search-form-mobile">
                 <input type="hidden" name="view" value="search">
                 <input type="search" name="q" placeholder="Search in Drive..." class="search-input" value="">
                 <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
             </form>
-
             <div class="toolbar">
                 <div class="left-actions">
                     <button type="button" class="icon-btn" onclick="openNewFolderModal()"><i
                             class="fas fa-folder-plus"></i> <span>New Folder</span></button>
+                    <button id="batch-move-btn" class="icon-btn disabled" onclick="openMoveModal()"><i
+                            class="fas fa-folder-open"></i> <span>Move</span></button>
                     <button id="batch-download-btn" class="icon-btn disabled" onclick="batchDownloadSelected()"><i
                             class="fas fa-file-archive"></i> <span>Download as ZIP</span></button>
                     <button id="batch-restore-btn" class="icon-btn disabled" onclick="batchRestoreSelected()"
@@ -1505,13 +1693,10 @@ if (isset($_SESSION['message'])) {
                         title="Grid View"><i class="fas fa-th-large"></i></button>
                 </div>
             </div>
-
-            <!-- This is the container for dynamic content -->
             <div id="main-content-area">
                 <div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
             </div>
         </div>
-
         <div id="details-panel">
             <div class="details-panel-header">
                 <h3>Details</h3>
@@ -1524,7 +1709,7 @@ if (isset($_SESSION['message'])) {
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals Section -->
     <div id="uploadModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1541,6 +1726,7 @@ if (isset($_SESSION['message'])) {
             </div>
         </div>
     </div>
+
     <div id="newFolderModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1560,6 +1746,7 @@ if (isset($_SESSION['message'])) {
             </form>
         </div>
     </div>
+
     <div id="renameModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1579,26 +1766,74 @@ if (isset($_SESSION['message'])) {
             </form>
         </div>
     </div>
+
     <div id="shareModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Share File</h2><button class="close-button" onclick="closeModal('shareModal')"><i
-                        class="fas fa-times"></i></button>
+                <h2>Share Settings</h2>
+                <button class="close-button" onclick="closeModal('shareModal')"><i class="fas fa-times"></i></button>
             </div>
-            <div class="modal-body">
-                <p>Copy the link to share:</p>
-                <div style="display:flex;">
-                    <input type="text" id="shareLinkInput" readonly style="flex-grow:1;">
-                    <button class="btn btn-primary" onclick="copyShareLink()"
-                        style="border-radius:0 var(--radius-default) var(--radius-default) 0;"><i
-                            class="fas fa-copy"></i></button>
+            <div class="modal-body" id="share-modal-body">
+                <input type="hidden" id="shareFileId">
+                <div id="share-link-section" style="display: none;">
+                    <label>Public Link</label>
+                    <div class="form-group" style="display:flex;">
+                        <input type="text" id="shareLinkInput" readonly
+                            style="flex-grow:1; border-top-right-radius: 0; border-bottom-right-radius: 0;">
+                        <button class="btn btn-primary" onclick="copyShareLink()"
+                            style="border-radius:0 var(--radius-default) var(--radius-default) 0;"><i
+                                class="fas fa-copy"></i></button>
+                    </div>
                 </div>
-                <p id="shareStatusMessage" style="margin-top:10px; color: var(--success-color);"></p>
+                <div id="create-share-link-section">
+                    <p style="text-align: center; color: var(--text-secondary);">This file is not currently shared.</p>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 25px 0;">
+                <div id="share-options-section" style="display: none;">
+                    <h4>Link Settings</h4>
+                    <div class="form-group">
+                        <label for="sharePassword">Password (optional)</label>
+                        <input type="password" id="sharePassword" placeholder="Protect with a password">
+                    </div>
+                    <div class="form-group">
+                        <label for="shareExpiry">Expiration Date (optional)</label>
+                        <input type="date" id="shareExpiry">
+                    </div>
+                    <div class="form-group form-group-inline">
+                        <input type="checkbox" id="shareAllowDownload" checked style="width: 18px; height: 18px;">
+                        <label for="shareAllowDownload">Allow downloading</label>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer"><button class="btn btn-cancel" onclick="closeModal('shareModal')">Close</button>
+            <div class="modal-footer" id="share-modal-footer">
+                <button type="button" class="btn btn-danger" id="removeShareLinkBtn"
+                    style="margin-right: auto; display: none;" onclick="removeShareLink()">Remove Link</button>
+                <button class="btn btn-cancel" onclick="closeModal('shareModal')">Close</button>
+                <button class="btn btn-primary" id="saveShareSettingsBtn" onclick="saveShareSettings()">Create
+                    Link</button>
             </div>
         </div>
     </div>
+
+    <div id="moveModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Move Items</h2>
+                <button class="close-button" onclick="closeModal('moveModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>Select a destination folder:</p>
+                <div id="folder-tree-container"
+                    style="max-height: 40vh; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-default); padding: 10px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('moveModal')">Cancel</button>
+                <button type="button" id="confirmMoveBtn" class="btn btn-primary" disabled>Move Here</button>
+            </div>
+        </div>
+    </div>
+
     <div id="previewModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1610,6 +1845,7 @@ if (isset($_SESSION['message'])) {
             </div>
         </div>
     </div>
+
     <div id="userInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1631,7 +1867,9 @@ if (isset($_SESSION['message'])) {
                         </div>
                         <div class="storage-details"
                             style="font-size:0.9em;justify-content:space-between;display:flex;">
-                            <span><?php echo formatBytes($totalSize); ?> used</span>
+                            <span><?php echo formatBytes(
+                                $totalSize
+                            ); ?> used</span>
                             <span><?php echo TOTAL_STORAGE_GB; ?> GB total</span>
                         </div>
                         <div id="storageChartContainer"><canvas id="storageChart"></canvas></div>
@@ -1640,8 +1878,36 @@ if (isset($_SESSION['message'])) {
                         <div class="about-section">
                             <div class="logo"><i class="fas fa-cloud-bolt"></i></div>
                             <h3><?php echo APP_NAME; ?></h3>
-                            <p>Version 1.0</p>
-                            <p>A simple, self-hosted file management solution.</p>
+                            <p>Version 2.0 - "Phoenix"</p>
+
+                            <p class="app-description">
+                                A modern, lightweight, and self-hostable cloud storage solution.
+                                Built with a fast Single Page Application experience, focusing on performance,
+                                mobility, and user-friendliness.
+                            </p>
+
+                            <div class="developer-info">
+                                <h4>Developed & Maintained By</h4>
+                                <p style="font-size: 1.2em; font-weight: 500; margin: 0; padding-bottom: 10px;">
+                                    <!-- THAY TÊN CỦA BẠN VÀO ĐÂY -->
+                                    Nam Trần
+                                </p>
+                                <div class="developer-links">
+                                    <!-- THAY CÁC LIÊN KẾT CỦA BẠN VÀO ĐÂY -->
+                                    <a href="https://github.com/namtran592005" target="_blank">
+                                        <i class="fab fa-github"></i> GitHub
+                                    </a>
+                                    <a href="https://tranvohoangnam.id.vn/portfolio" target="_blank">
+                                        <i class="fas fa-globe"></i> Portfolio
+                                    </a>
+                                    <a href="https://www.facebook.com/namtran5905" target="_blank">
+                                        <i class="fab fa-facebook"></i> Facebook
+                                    </a>
+                                    <a href="https://www.instagram.com/namtran5905/" target="_blank">
+                                        <i class="fab fa-instagram"></i> Instagram
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1650,6 +1916,7 @@ if (isset($_SESSION['message'])) {
             </div>
         </div>
     </div>
+
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1665,169 +1932,167 @@ if (isset($_SESSION['message'])) {
             </div>
         </div>
     </div>
+
     <div id="actionPopover" class="action-popover"></div>
+</body>
+<script>
+// ===================================================================================
+// JAVASCRIPT SECTION - UPDATED FOR REFACTORED BACKEND
+// ===================================================================================
 
-    <script>
-    // ===================================================================================
-    // JAVASCRIPT SECTION - UPDATED FOR REFACTORED BACKEND
-    // ===================================================================================
+const G = {
+    BASE_URL: '<?php echo BASE_URL; ?>',
+    currentPage: '',
+    currentFolderId: 1,
+    currentPath: '',
+    storageChartInstance: null,
+    plyrInstance: null,
+    viewMode: 'list',
+    itemsToMove: [],
+    destinationFolderId: null
+};
 
-    const G = {
-        BASE_URL: '<?php echo BASE_URL; ?>',
-        currentPage: '',
-        currentFolderId: 1,
-        currentPath: '',
-        storageChartInstance: null,
-        plyrInstance: null,
-        viewMode: 'list',
-    };
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
-    const $ = (selector) => document.querySelector(selector);
-    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+function showToast(message, type = 'success') {
+    const container = $('#toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, 4000);
+}
 
-    function showToast(message, type = 'success') {
-        const container = $('#toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        container.appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 10);
-        setTimeout(() => {
-            toast.classList.remove('show');
-            toast.addEventListener('transitionend', () => toast.remove());
-        }, 4000);
-    }
-
-    // THAY THẾ HÀM CŨ BẰNG HÀM NÀY
-    async function apiCall(action, data = {}, method = 'POST') {
-        try {
-            let response;
-            if (method === 'POST') {
-                const formData = new FormData();
-                formData.append('action', action);
-                // Gửi file và các dữ liệu khác qua FormData
-                for (const key in data) {
-                    if (data[key] instanceof File) {
-                        formData.append(key, data[key], data[key].name);
-                    } else if (Array.isArray(data[key])) {
-                        data[key].forEach(value => formData.append(key + '[]', value));
-                    } else {
-                        formData.append(key, data[key]);
-                    }
-                }
-                response = await fetch('api.php', {
-                    method: 'POST',
-                    body: formData
-                });
-            } else { // GET method
-                const params = new URLSearchParams(data);
-                params.append('action', action);
-                // URL đầy đủ sẽ là: api.php?action=get_view_data&view=browse&path=...
-                response = await fetch(`api.php?${params.toString()}`);
-            }
-
-            // Kiểm tra xem server có trả về lỗi HTTP không
-            if (!response.ok) {
-                // Lấy thông điệp lỗi từ server nếu có, nếu không thì dùng status text mặc định
-                const errorText = await response.text();
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.message || `HTTP error! Status: ${response.status}`);
-                } catch (e) {
-                    throw new Error(errorText || `HTTP error! Status: ${response.status}`);
-                }
-            }
-
-            const result = await response.json();
-            return result;
-
-        } catch (error) {
-            console.error('API Call Error:', {
-                action,
-                data,
-                error
-            });
-            showToast(error.message, 'danger');
-            return {
-                success: false,
-                message: error.message
-            };
-        }
-    }
-
-    /**
-     * Hàm chính để render lại toàn bộ nội dung chính của trang
-     * @param {object} data Dữ liệu từ API `get_view_data`
-     */
-    function renderMainContent(data) {
-        G.currentPage = data.view;
-        G.currentFolderId = data.currentFolderId;
-        G.currentPath = data.currentPath;
-
-        $('#page-title').textContent = data.pageTitle;
-        $('#page-stats').textContent = `${data.items.length} items`;
-        document.title = `${data.pageTitle} - <?php echo APP_NAME; ?>`;
-
-        $$('.sidebar-nav-item a').forEach(a => a.classList.remove('active'));
-        const activeLink = $(`.sidebar-nav-item a[data-view="${data.view}"]`);
-        if (activeLink) activeLink.classList.add('active');
-
-        const mainArea = $('#main-content-area');
-        let breadcrumbsHTML = '';
-        if (data.view === 'browse' && data.breadcrumbs.length > 0) {
-            breadcrumbsHTML = `<div class="breadcrumbs">`;
-            data.breadcrumbs.forEach((crumb, index) => {
-                if (index > 0) breadcrumbsHTML += `<span class="separator">/</span>`;
-                if (index === data.breadcrumbs.length - 1 && crumb.path) {
-                    breadcrumbsHTML += `<span class="current-folder">${escapeHtml(crumb.name)}</span>`;
+// THAY THẾ HÀM apiCall CŨ BẰNG HÀM NÀY
+async function apiCall(action, data = {}, method = 'POST', showToastOnError = true) {
+    try {
+        let response;
+        // ... (phần logic fetch GET/POST giữ nguyên)
+        if (method === 'POST') {
+            const formData = new FormData();
+            formData.append('action', action);
+            for (const key in data) {
+                if (data[key] instanceof File) {
+                    formData.append(key, data[key], data[key].name);
+                } else if (Array.isArray(data[key])) {
+                    data[key].forEach(value => formData.append(key + '[]', value));
                 } else {
-                    breadcrumbsHTML +=
-                        `<a href="?view=browse&path=${encodeURIComponent(crumb.path)}">${escapeHtml(crumb.name)}</a>`;
+                    formData.append(key, data[key]);
                 }
-            });
-            breadcrumbsHTML += `</div>`;
-        }
-
-        let trashActionsHTML = '';
-        if (data.view === 'trash' && data.items.length > 0) {
-            trashActionsHTML =
-                `<div class="trash-actions"><button type="button" class="btn-clean" onclick="confirmEmptyTrash()"><i class="fas fa-broom"></i> Empty Trash</button></div>`;
-        }
-
-        // Cập nhật toolbar
-        $('#newFolderForm input[name="parent_id"]').value = G.currentFolderId;
-        const batchRestoreBtn = $('#batch-restore-btn');
-        const batchDeleteBtn = $('#batch-delete-btn');
-
-        if (data.view === 'trash') {
-            batchRestoreBtn.style.display = 'flex';
-            batchDeleteBtn.querySelector('span').textContent = 'Delete Permanently';
-        } else {
-            batchRestoreBtn.style.display = 'none';
-            batchDeleteBtn.querySelector('span').textContent = 'Delete';
-        }
-
-        let contentHTML = '';
-        if (data.items.length === 0) {
-            contentHTML = '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
-        } else {
-            let tableRows = '';
-            let gridItems = '';
-
-            if (data.view === 'browse' && data.parentPath !== null) {
-                const parentUrl = `?view=browse&path=${encodeURIComponent(data.parentPath)}`;
-                tableRows +=
-                    `<tr data-type="parent-folder"><td></td><td class="file-name-cell"><a href="${parentUrl}"><i class="fas fa-level-up-alt"></i><span class="file-text">..</span></a></td><td>Folder</td><td>--</td><td>--</td><td></td></tr>`;
-                gridItems +=
-                    `<div class="grid-item" data-type="parent-folder" onclick="navigateToPath('${parentUrl}')"><i class="fas fa-level-up-alt grid-icon"></i><span class="grid-name">..</span></div>`;
             }
-
-            data.items.forEach(item => {
-                tableRows += renderFileRowHTML(item);
-                gridItems += renderGridItemHTML(item);
+            response = await fetch('api.php', {
+                method: 'POST',
+                body: formData
             });
+        } else {
+            const params = new URLSearchParams(data);
+            params.append('action', action);
+            response = await fetch(`api.php?${params.toString()}`);
+        }
 
-            contentHTML = `
+        if (!response.ok) {
+            const errorText = await response.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                throw new Error(errorJson.message || `HTTP error! Status: ${response.status}`);
+            } catch (e) {
+                throw new Error(errorText || `HTTP error! Status: ${response.status}`);
+            }
+        }
+
+        return await response.json();
+
+    } catch (error) {
+        console.error('API Call Error:', {
+            action,
+            data,
+            error
+        });
+        // Chỉ hiển thị toast nếu được yêu cầu
+        if (showToastOnError) {
+            showToast(error.message, 'danger');
+        }
+        // Trả về một promise bị reject để .catch() có thể hoạt động
+        return Promise.reject(error);
+    }
+}
+
+function renderMainContent(data) {
+    G.currentPage = data.view;
+    G.currentFolderId = data.currentFolderId;
+    G.currentPath = data.currentPath;
+
+    $('#page-title').textContent = data.pageTitle;
+    $('#page-stats').textContent = `${data.items.length} items`;
+    document.title = `${data.pageTitle} - <?php echo APP_NAME; ?>`;
+
+    $$('.sidebar-nav-item a').forEach(a => a.classList.remove('active'));
+    const activeLink = $(`.sidebar-nav-item a[data-view="${data.view}"]`);
+    if (activeLink) activeLink.classList.add('active');
+
+    const mainArea = $('#main-content-area');
+    let breadcrumbsHTML = '';
+    if (data.view === 'browse' && data.breadcrumbs.length > 0) {
+        breadcrumbsHTML = `<div class="breadcrumbs">`;
+        data.breadcrumbs.forEach((crumb, index) => {
+            if (index > 0) breadcrumbsHTML += `<span class="separator">/</span>`;
+            if (index === data.breadcrumbs.length - 1 && crumb.path) {
+                breadcrumbsHTML += `<span class="current-folder">${escapeHtml(crumb.name)}</span>`;
+            } else {
+                breadcrumbsHTML +=
+                    `<a href="?view=browse&path=${encodeURIComponent(crumb.path)}">${escapeHtml(crumb.name)}</a>`;
+            }
+        });
+        breadcrumbsHTML += `</div>`;
+    }
+
+    let trashActionsHTML = '';
+    if (data.view === 'trash' && data.items.length > 0) {
+        trashActionsHTML =
+            `<div class="trash-actions"><button type="button" class="btn-clean" onclick="confirmEmptyTrash()"><i class="fas fa-broom"></i> Empty Trash</button></div>`;
+    }
+
+    $('#newFolderForm input[name="parent_id"]').value = G.currentFolderId;
+    const batchRestoreBtn = $('#batch-restore-btn');
+    const batchDeleteBtn = $('#batch-delete-btn');
+    const batchMoveBtn = $('#batch-move-btn');
+
+    if (data.view === 'trash') {
+        batchRestoreBtn.style.display = 'flex';
+        batchDeleteBtn.querySelector('span').textContent = 'Delete Permanently';
+        batchMoveBtn.style.display = 'none';
+    } else {
+        batchRestoreBtn.style.display = 'none';
+        batchDeleteBtn.querySelector('span').textContent = 'Delete';
+        batchMoveBtn.style.display = 'flex';
+    }
+
+    let contentHTML = '';
+    if (data.items.length === 0) {
+        contentHTML = '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
+    } else {
+        let tableRows = '';
+        let gridItems = '';
+
+        if (data.view === 'browse' && data.parentPath !== null) {
+            const parentUrl = `?view=browse&path=${encodeURIComponent(data.parentPath)}`;
+            tableRows +=
+                `<tr data-type="parent-folder"><td></td><td class="file-name-cell"><a href="${parentUrl}"><i class="fas fa-level-up-alt"></i><span class="file-text">..</span></a></td><td>Folder</td><td>--</td><td>--</td><td></td></tr>`;
+            gridItems +=
+                `<div class="grid-item" data-type="parent-folder" onclick="navigateToPath('${parentUrl}')"><i class="fas fa-level-up-alt grid-icon"></i><span class="grid-name">..</span></div>`;
+        }
+
+        data.items.forEach(item => {
+            tableRows += renderFileRowHTML(item);
+            gridItems += renderGridItemHTML(item);
+        });
+
+        contentHTML = `
                 <div id="file-list-container">
                     <table class="file-table">
                         <thead>
@@ -1840,993 +2105,1099 @@ if (isset($_SESSION['message'])) {
                     </table>
                     <div id="grid-view-container">${gridItems}</div>
                 </div>`;
-        }
-
-        mainArea.innerHTML = breadcrumbsHTML + trashActionsHTML + contentHTML;
-
-        setViewMode(G.viewMode);
-        updateToolbarState();
-        closeDetailsPanel();
     }
 
-    /**
-     * Hàm điều hướng chính, gọi API và render lại trang
-     * @param {string} url URL để điều hướng (ví dụ: `?view=trash`)
-     * @param {boolean} isPopState Cho biết đây có phải là sự kiện từ nút Back/Forward không
-     */
-    async function navigateToPath(url, isPopState = false) {
-        const fullUrl = new URL(url, G.BASE_URL);
-        if (!isPopState) {
-            history.pushState({
-                path: url
-            }, '', url);
-        }
+    mainArea.innerHTML = breadcrumbsHTML + trashActionsHTML + contentHTML;
 
+    setViewMode(G.viewMode);
+    updateToolbarState();
+    closeDetailsPanel();
+}
+
+async function navigateToPath(url, isPopState = false) {
+    const fullUrl = new URL(url, G.BASE_URL);
+    if (!isPopState) {
+        history.pushState({
+            path: url
+        }, '', url);
+    }
+
+    $('#main-content-area').innerHTML =
+        '<div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+
+    const params = Object.fromEntries(fullUrl.searchParams);
+    const data = await apiCall('get_view_data', params, 'GET');
+
+    if (data.success) {
+        renderMainContent(data);
+    } else {
+        showToast(data.message, 'danger');
         $('#main-content-area').innerHTML =
-            '<div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-
-        const params = Object.fromEntries(fullUrl.searchParams);
-        const data = await apiCall('get_view_data', params, 'GET');
-
-        if (data.success) {
-            renderMainContent(data);
-        } else {
-            showToast(data.message, 'danger');
-            $('#main-content-area').innerHTML =
-                `<div class="no-files"><i class="fas fa-exclamation-triangle"></i><p>${data.message}</p></div>`;
-        }
+            `<div class="no-files"><i class="fas fa-exclamation-triangle"></i><p>${data.message}</p></div>`;
     }
+}
 
-    // --- CÁC HÀM KHÁC GIỮ NGUYÊN HOẶC CHỈ CẬP NHẬT NHỎ ---
+function renderFileRowHTML(item) {
+    const fileInfo = getFileIconJS(item.name, item.type === 'folder');
+    const kind = item.type === 'folder' ? 'Folder' : (item.name.split('.').pop().toUpperCase() || 'File');
+    const size = item.type === 'folder' ? '--' : formatBytesJS(item.size);
+    const modifiedDate = new Date(item.modified * 1000).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).replace(',', '');
+    const nameEscaped = escapeHtml(item.name);
 
-    function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
-        const fileListContainer = $('#main-content-area'); // Target the main area now
-
-        idsToRemove.forEach(id => {
-            const row = $(`tr[data-id="${id}"]`);
-            if (row) row.remove();
-            const gridItem = $(`.grid-item[data-id="${id}"]`);
-            if (gridItem) gridItem.remove();
-        });
-
-        if (itemsToAdd.length > 0) {
-            const noFilesDiv = $('.no-files');
-            if (noFilesDiv) {
-                // If it was empty, we need to refresh the view to get the table structure back
-                navigateToPath(window.location.search, true);
-                return; // Stop here, the refresh will handle adding
-            }
-            const tbody = fileListContainer.querySelector('tbody');
-            const gridContainer = fileListContainer.querySelector('#grid-view-container');
-            if (tbody && gridContainer) {
-                itemsToAdd.forEach(item => {
-                    tbody.insertAdjacentHTML('beforeend', renderFileRowHTML(item));
-                    gridContainer.insertAdjacentHTML('beforeend', renderGridItemHTML(item));
-                });
-            }
-        }
-
-        if ($$('.selectable').length === 0 && !$('[data-type="parent-folder"]')) {
-            fileListContainer.querySelector('#file-list-container').innerHTML =
-                '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
-        }
-
-        const currentItemCount = $$('.file-table tbody tr.selectable').length;
-        $('#page-stats').textContent = `${currentItemCount} items`;
-        updateToolbarState();
-        closeDetailsPanel();
-    }
-
-    function renderFileRowHTML(item) {
-        const fileInfo = getFileIconJS(item.name, item.type === 'folder');
-        const kind = item.type === 'folder' ? 'Folder' : (item.name.split('.').pop().toUpperCase() || 'File');
-        const size = item.type === 'folder' ? '--' : formatBytesJS(item.size);
-        const modifiedDate = new Date(item.modified * 1000).toLocaleString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        }).replace(',', '');
-        const nameEscaped = escapeHtml(item.name);
-
-        let nameCellContent;
-        if (item.type === 'folder' && (G.currentPage === 'browse' || G.currentPage === 'search')) {
-            const path = G.currentPage === 'browse' ? item.relative_path : item.full_path;
-            const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
-            nameCellContent =
-                `<a href="${linkUrl}"><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></a>`;
-            if (G.currentPage === 'search') {
-                const pathInfo = item.full_path ? `in /${escapeHtml(item.full_path)}` : 'in Drive';
-                nameCellContent = `<a href="${linkUrl}" title="Go to folder">
+    let nameCellContent;
+    if (item.type === 'folder' && (G.currentPage === 'browse' || G.currentPage === 'search')) {
+        const path = G.currentPage === 'browse' ? item.relative_path : item.full_path;
+        const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
+        nameCellContent =
+            `<a href="${linkUrl}"><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></a>`;
+        if (G.currentPage === 'search') {
+            const pathInfo = item.full_path ? `in /${escapeHtml(item.full_path)}` : 'in Drive';
+            nameCellContent = `<a href="${linkUrl}" title="Go to folder">
                     <i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i>
                     <span class="file-text">${nameEscaped}<small style="display: block; color: var(--text-secondary); font-weight: 400; margin-top: 3px;">${pathInfo}</small></span>
                 </a>`;
-            }
-        } else {
-            nameCellContent =
-                `<span><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></span>`;
         }
+    } else {
+        nameCellContent =
+            `<span><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></span>`;
+    }
 
-        return `<tr class="selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}">
+    return `<tr class="selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}">
             <td><input style="display: none;" type="checkbox" id="cb-${item.id}"><label for="cb-${item.id}" class="custom-checkbox-label"></label></td>
             <td class="file-name-cell">${nameCellContent}</td><td>${kind}</td><td>${size}</td><td>${modifiedDate}</td>
             <td><div class="file-actions"><button type="button" class="action-btn" title="More" onclick="showActionPopover(this, event)"><i class="fas fa-ellipsis-v"></i></button></div></td>
         </tr>`;
+}
+
+function renderGridItemHTML(item) {
+    const fileInfo = getFileIconJS(item.name, item.type === 'folder');
+    const nameEscaped = escapeHtml(item.name);
+    let clickHandler = '';
+    if (item.type === 'folder' && G.currentPage === 'browse') {
+        const path = item.relative_path;
+        const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
+        clickHandler = `onclick="navigateToPath('${linkUrl}')"`;
+    } else if (item.type === 'file') {
+        clickHandler = `ondblclick="openPreviewModal('${escapeJS(nameEscaped)}', ${item.id})"`;
     }
 
-    function renderGridItemHTML(item) {
-        const fileInfo = getFileIconJS(item.name, item.type === 'folder');
-        const nameEscaped = escapeHtml(item.name);
-        let clickHandler = '';
-        if (item.type === 'folder' && G.currentPage === 'browse') {
-            const path = item.relative_path;
-            const linkUrl = `?view=browse&path=${encodeURIComponent(path)}`;
-            clickHandler = `onclick="navigateToPath('${linkUrl}')"`;
-        } else if (item.type === 'file') {
-            clickHandler = `ondblclick="openPreviewModal('${escapeJS(nameEscaped)}', ${item.id})"`;
-        }
-
-        return `<div class="grid-item selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}" ${clickHandler}>
+    return `<div class="grid-item selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}" ${clickHandler}>
             <div class="grid-checkbox-overlay">
                 <input style="display: none;" type="checkbox" id="cb-grid-${item.id}"><label for="cb-grid-${item.id}" class="custom-checkbox-label"></label>
             </div>
             <i class="fas ${fileInfo.icon} grid-icon" style="color: ${fileInfo.color};"></i>
             <span class="grid-name">${nameEscaped}</span>
         </div>`;
+}
+
+async function openMoveModal() {
+    G.itemsToMove = $$('.selectable.selected').map(el => parseInt(el.dataset.id));
+    if (G.itemsToMove.length === 0) return;
+
+    openModal('moveModal');
+    const container = $('#folder-tree-container');
+    container.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    const result = await apiCall('get_folder_tree', {
+        exclude_ids: G.itemsToMove
+    });
+
+    if (result.success) {
+        container.innerHTML = '<ul class="folder-tree">' + renderFolderTree(result.tree) + '</ul>';
+    } else {
+        container.innerHTML = '<p style="color: var(--danger-color)">Could not load folder tree.</p>';
     }
 
-    // --- TOÀN BỘ CÁC HÀM JAVASCRIPT KHÁC TỪ ĐÂY TRỞ VỀ TRƯỚC VẪN GIỮ NGUYÊN ---
-    // (bao gồm: setViewMode, batchDeleteSelected, confirmEmptyTrash, drag-drop, showActionPopover,
-    // openDetailsPanel, live search, modals, upload, helpers, v.v...)
-    function updateToolbarState() {
-        const selectedCount = $$('.selectable.selected').length;
-        $('#batch-delete-btn').classList.toggle('disabled', selectedCount === 0);
-        $('#batch-download-btn').classList.toggle('disabled', selectedCount === 0);
-        if ($('#batch-restore-btn')) $('#batch-restore-btn').classList.toggle('disabled', selectedCount === 0);
-        const totalRows = $$('.selectable').length;
-        const selectAllCheckbox = $('#select-all-checkbox');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.checked = (totalRows > 0 && selectedCount === totalRows);
-        }
+    $('#confirmMoveBtn').disabled = true;
+    G.destinationFolderId = null;
+}
+
+function renderFolderTree(nodes) {
+    let html = '';
+    nodes.forEach(node => {
+        const hasChildren = node.children && node.children.length > 0;
+        html += `
+                <li>
+                    <div class="folder-item" data-id="${node.id}">
+                        ${hasChildren ? '<i class="fas fa-chevron-down toggle-icon"></i>' : '<i class="fas fa-empty toggle-icon" style="width:16px"></i>'}
+                        <i class="fas fa-folder"></i>
+                        <span>${escapeHtml(node.name)}</span>
+                    </div>
+                    ${hasChildren ? `<ul style="display: none;">${renderFolderTree(node.children)}</ul>` : ''}
+                </li>
+            `;
+    });
+    return html;
+}
+
+function openMoveModalWithSingleItem(itemId) {
+    $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
+    const itemElement = $(`.selectable[data-id="${itemId}"]`);
+    if (itemElement) itemElement.classList.add('selected');
+    updateToolbarState();
+    openMoveModal();
+}
+
+function updateToolbarState() {
+    const selectedCount = $$('.selectable.selected').length;
+    $('#batch-delete-btn').classList.toggle('disabled', selectedCount === 0);
+    $('#batch-download-btn').classList.toggle('disabled', selectedCount === 0);
+    $('#batch-move-btn').classList.toggle('disabled', selectedCount === 0 || G.currentPage === 'trash');
+    if ($('#batch-restore-btn')) $('#batch-restore-btn').classList.toggle('disabled', selectedCount === 0);
+    const totalRows = $$('.selectable').length;
+    const selectAllCheckbox = $('#select-all-checkbox');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = (totalRows > 0 && selectedCount === totalRows);
     }
-    async function batchDeleteSelected(isPermanent = false) {
-        const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
-        if (selectedIds.length === 0) return;
-        const msgAction = G.currentPage === 'trash' || isPermanent ? 'permanently delete' : 'move to trash';
-        const message = `Are you sure you want to ${msgAction} ${selectedIds.length} item(s)?`;
-        const title = 'Confirm Deletion';
-        showConfirmModal(title, message, async () => {
-            const result = await apiCall('delete', {
+}
+
+function showActionPopover(targetElement, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const itemElement = targetElement.closest('.selectable');
+    if (!itemElement) return;
+    const id = itemElement.dataset.id,
+        name = itemElement.dataset.name,
+        type = itemElement.dataset.type,
+        shareId = itemElement.dataset.shareId || '';
+    let content = '';
+
+    if (G.currentPage === 'trash') {
+        content =
+            `<button type="button" class="popover-item" onclick="batchRestoreSelectedWrapper(${id})"><i class="fas fa-redo-alt"></i> Restore</button>
+                       <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(true, ${id})"><i class="fas fa-times"></i> Delete Forever</button>`;
+    } else {
+        if (type !== 'folder') {
+            content +=
+                `<a class="popover-item" href="api.php?action=download_file&id=${id}"><i class="fas fa-download"></i> Download</a>
+                            <button type="button" class="popover-item" onclick="openShareModal(${id},'${shareId}')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button type="button" class="popover-item" onclick="openPreviewModal('${escapeJS(name)}', ${id})"><i class="fas fa-eye"></i> View</button>`;
+        }
+        content +=
+            `<button type="button" class="popover-item" onclick="openMoveModalWithSingleItem(${id})"><i class="fas fa-folder-open"></i> Move</button>
+                        <button type="button" class="popover-item" onclick="openRenameModal(${id},'${escapeJS(name)}', '${type}')"><i class="fas fa-edit"></i> Rename</button>
+                        <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(false, ${id})"><i class="fas fa-trash-alt"></i> Trash</button>`;
+    }
+
+    const popover = $('#actionPopover');
+    popover.innerHTML = content;
+    popover.classList.add('show');
+    const popoverRect = popover.getBoundingClientRect();
+    let top, left;
+    if (e.type === 'contextmenu') {
+        top = e.clientY;
+        left = e.clientX;
+    } else {
+        const rect = targetElement.getBoundingClientRect();
+        top = rect.bottom;
+        left = rect.right - popoverRect.width;
+    }
+    if (top + popoverRect.height > window.innerHeight) top = window.innerHeight - popoverRect.height - 10;
+    if (left + popoverRect.width > window.innerWidth) left = window.innerWidth - popoverRect.width - 10;
+    if (top < 10) top = 10;
+    if (left < 10) left = 10;
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+}
+
+function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
+    idsToRemove.forEach(id => {
+        $$(`.selectable[data-id="${id}"]`).forEach(el => el.remove());
+    });
+
+    if (itemsToAdd.length > 0) {
+        navigateToPath(window.location.search, true);
+        return;
+    }
+
+    if ($$('.selectable').length === 0 && !$('[data-type="parent-folder"]')) {
+        const container = $('#file-list-container');
+        if (container) container.innerHTML =
+            '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
+    }
+
+    const currentItemCount = $$('.selectable').length;
+    $('#page-stats').textContent = `${currentItemCount} items`;
+    updateToolbarState();
+    closeDetailsPanel();
+}
+
+// Các hàm còn lại giữ nguyên...
+// THAY THẾ HÀM batchDeleteSelected CŨ BẰNG HÀM NÀY
+async function batchDeleteSelected(isPermanent = false) {
+    const selectedItems = $$('.selectable.selected');
+    if (selectedItems.length === 0) return;
+
+    const selectedIds = selectedItems.map(el => el.dataset.id);
+    const msgAction = G.currentPage === 'trash' || isPermanent ? 'permanently delete' : 'move to trash';
+    const message = `Are you sure you want to ${msgAction} ${selectedIds.length} item(s)?`;
+
+    showConfirmModal('Confirm Deletion', message, () => {
+        // --- Optimistic UI Update ---
+        // 1. Ẩn các mục khỏi giao diện ngay lập tức
+        const originalParents = new Map();
+        selectedItems.forEach(item => {
+            originalParents.set(item, item.parentNode); // Lưu lại vị trí cũ
+            item.style.transition = 'opacity 0.3s ease';
+            item.style.opacity = '0';
+        });
+
+        // Sau khi hiệu ứng mờ kết thúc, xóa hẳn khỏi DOM
+        setTimeout(() => {
+            selectedItems.forEach(item => item.remove());
+            updateUIOnItemChange([], []); // Cập nhật lại số lượng item
+        }, 300);
+
+        showToast(`${selectedIds.length} item(s) moved to trash.`, 'info');
+
+        // 2. Gửi yêu cầu API trong nền
+        apiCall('delete', {
                 ids: selectedIds,
                 force_delete: (G.currentPage === 'trash' || isPermanent)
+            }, 'POST', false) // `false` để không tự động hiện toast lỗi
+            .catch(error => {
+                // 3. Nếu API thất bại, khôi phục lại UI
+                showToast(`Failed to delete items: ${error.message}. Restoring view.`, 'danger');
+                // Cách đơn giản nhất để khôi phục là tải lại view
+                navigateToPath(window.location.search, true);
             });
-            if (result.success) {
-                showToast(result.message);
-                updateUIOnItemChange(selectedIds);
-            }
-        });
-    }
-    async function batchRestoreSelected() {
-        const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
-        if (selectedIds.length === 0) return;
-        showConfirmModal('Confirm Restore', `Are you sure you want to restore ${selectedIds.length} item(s)?`,
+    });
+}
+
+async function batchRestoreSelected() {
+    const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
+    if (selectedIds.length === 0) return;
+    showConfirmModal('Confirm Restore', `Are you sure you want to restore ${selectedIds.length} item(s)?`,
         async () => {
-                const result = await apiCall('restore', {
-                    ids: selectedIds
-                });
-                if (result.success) {
-                    showToast(result.message);
-                    navigateToPath('?view=trash', true);
-                }
-            });
-    }
-    async function confirmEmptyTrash() {
-        showConfirmModal('Confirm Empty Trash',
-            'This will permanently delete all items in the trash. This cannot be undone.', async () => {
-                const result = await apiCall('empty_trash');
-                if (result.success) {
-                    showToast(result.message);
-                    navigateToPath('?view=trash', true);
-                }
-            });
-    }
-    let draggedItemId = null;
-    document.addEventListener('dragstart', e => {
-        const target = e.target.closest('.selectable[draggable="true"]');
-        if (target) {
-            draggedItemId = target.dataset.id;
-            target.classList.add('dragged');
-            e.dataTransfer.setData('text/plain', draggedItemId);
-        }
-    });
-    document.addEventListener('dragend', e => {
-        const target = e.target.closest('.dragged');
-        if (target) target.classList.remove('dragged');
-    });
-    document.addEventListener('dragover', e => {
-        e.preventDefault();
-    });
-    document.addEventListener('dragenter', e => {
-        const dropTarget = e.target.closest('.selectable[data-type="folder"]');
-        if (dropTarget && draggedItemId && draggedItemId !== dropTarget.dataset.id) dropTarget.classList.add(
-            'drag-over');
-    });
-    document.addEventListener('dragleave', e => {
-        const dropTarget = e.target.closest('.selectable[data-type="folder"]');
-        if (dropTarget) dropTarget.classList.remove('drag-over');
-    });
-    document.addEventListener('drop', async e => {
-        e.preventDefault();
-        const dropTarget = e.target.closest('.selectable[data-type="folder"]');
-        $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        if (dropTarget && draggedItemId && draggedItemId !== dropTarget.dataset.id) {
-            const result = await apiCall('move', {
-                item_id: draggedItemId,
-                destination_id: dropTarget.dataset.id
-            });
-            if (result.success) {
-                showToast(result.message);
-                updateUIOnItemChange([draggedItemId]);
-            }
-        }
-    });
-
-    function setViewMode(mode) {
-        G.viewMode = mode;
-        localStorage.setItem('viewMode', mode);
-        const container = $('#file-list-container');
-        if (container) {
-            if (mode === 'grid') {
-                container.classList.add('grid-view');
-                $('#grid-view-btn').style.display = 'none';
-                $('#list-view-btn').style.display = 'flex';
-            } else {
-                container.classList.remove('grid-view');
-                $('#list-view-btn').style.display = 'none';
-                $('#grid-view-btn').style.display = 'flex';
-            }
-        }
-    }
-
-    function batchDownloadSelected() {
-        const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
-        if (selectedIds.length === 0) return;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'api.php';
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'download_archive';
-        form.appendChild(actionInput);
-        selectedIds.forEach(id => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'ids[]';
-            input.value = id;
-            form.appendChild(input);
-        });
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-    }
-
-    function showActionPopover(targetElement, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const itemElement = targetElement.closest('.selectable');
-        if (!itemElement) return;
-        const id = itemElement.dataset.id,
-            name = itemElement.dataset.name,
-            type = itemElement.dataset.type,
-            shareId = itemElement.dataset.shareId || '';
-        let content = '';
-        if (G.currentPage === 'trash') {
-            content =
-                ` <button type="button" class="popover-item" onclick="batchRestoreSelectedWrapper(${id})"><i class="fas fa-redo-alt"></i> Restore</button> <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(true, ${id})"><i class="fas fa-times"></i> Delete Forever</button> `;
-        } else {
-            if (type !== 'folder') {
-                content +=
-                    `<a class="popover-item" href="api.php?action=download_file&id=${id}"><i class="fas fa-download"></i> Download</a> <button type="button" class="popover-item" onclick="openShareModal(${id},'${shareId}')"><i class="fas fa-share-alt"></i> Share</button> <button type="button" class="popover-item" onclick="openPreviewModal('${escapeJS(name)}', ${id})"><i class="fas fa-eye"></i> View</button>`;
-            }
-            content +=
-                `<button type="button" class="popover-item" onclick="openRenameModal(${id},'${escapeJS(name)}', '${type}')"><i class="fas fa-edit"></i> Rename</button> <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(false, ${id})"><i class="fas fa-trash-alt"></i> Trash</button>`;
-        }
-        const popover = $('#actionPopover');
-        popover.innerHTML = content;
-        popover.classList.add('show');
-        const popoverRect = popover.getBoundingClientRect();
-        let top, left;
-        if (e.type === 'contextmenu') {
-            top = e.clientY;
-            left = e.clientX;
-        } else {
-            const rect = targetElement.getBoundingClientRect();
-            top = rect.bottom;
-            left = rect.right - popoverRect.width;
-        }
-        if (top + popoverRect.height > window.innerHeight) top = window.innerHeight - popoverRect.height - 10;
-        if (left + popoverRect.width > window.innerWidth) left = window.innerWidth - popoverRect.width - 10;
-        if (top < 10) top = 10;
-        if (left < 10) left = 10;
-        popover.style.top = `${top}px`;
-        popover.style.left = `${left}px`;
-    }
-
-    function batchDeleteSelectedWrapper(isPermanent, id) {
-        const msgAction = isPermanent ? 'permanently delete' : 'move to trash';
-        showConfirmModal('Confirm Deletion', `Are you sure you want to ${msgAction} this item?`, async () => {
-            const result = await apiCall('delete', {
-                ids: [id],
-                force_delete: isPermanent
-            });
-            if (result.success) {
-                showToast(result.message);
-                updateUIOnItemChange([id]);
-            }
-        });
-    }
-
-    function batchRestoreSelectedWrapper(id) {
-        showConfirmModal('Confirm Restore', 'Are you sure you want to restore this item?', async () => {
             const result = await apiCall('restore', {
-                ids: [id]
+                ids: selectedIds
             });
             if (result.success) {
                 showToast(result.message);
                 navigateToPath('?view=trash', true);
             }
         });
+}
+async function confirmEmptyTrash() {
+    showConfirmModal('Confirm Empty Trash',
+        'This will permanently delete all items in the trash. This cannot be undone.', async () => {
+            const result = await apiCall('empty_trash');
+            if (result.success) {
+                showToast(result.message);
+                navigateToPath('?view=trash', true);
+            }
+        });
+}
+let draggedItemId = null;
+document.addEventListener('dragstart', e => {
+    const target = e.target.closest('.selectable[draggable="true"]');
+    if (target) {
+        draggedItemId = target.dataset.id;
+        target.classList.add('dragged');
+        e.dataTransfer.setData('text/plain', draggedItemId);
     }
-    async function openDetailsPanel(itemId) {
-        const panel = $('#details-panel');
-        const body = $('#details-panel-body');
-        panel.classList.add('active');
-        $('.main-content').classList.add('details-panel-active');
-        body.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
-        const result = await apiCall('get_details', {
-            id: itemId
+});
+document.addEventListener('dragend', e => {
+    const target = e.target.closest('.dragged');
+    if (target) target.classList.remove('dragged');
+});
+document.addEventListener('dragover', e => {
+    e.preventDefault();
+});
+document.addEventListener('dragenter', e => {
+    const dropTarget = e.target.closest('.selectable[data-type="folder"]');
+    if (dropTarget && draggedItemId && draggedItemId !== dropTarget.dataset.id) dropTarget.classList.add(
+        'drag-over');
+});
+document.addEventListener('dragleave', e => {
+    const dropTarget = e.target.closest('.selectable[data-type="folder"]');
+    if (dropTarget) dropTarget.classList.remove('drag-over');
+});
+document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const dropTarget = e.target.closest('.selectable[data-type="folder"]');
+    $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    if (dropTarget && draggedItemId && draggedItemId !== dropTarget.dataset.id) {
+        const result = await apiCall('move', {
+            item_ids: [draggedItemId],
+            destination_id: dropTarget.dataset.id
         });
         if (result.success) {
-            const item = result.item;
-            const fileInfo = getFileIconJS(item.name, item.type === 'folder');
-            const previewHTML = item.preview_url ? `<img src="${item.preview_url}" alt="Preview">` :
-                `<i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i>`;
-            body.innerHTML =
-                ` <div class="details-preview">${previewHTML}</div> <dl class="details-info-list"> <dt>Name</dt> <dd>${escapeHtml(item.name)}</dd> <dt>Kind</dt> <dd>${escapeHtml(item.kind)}</dd> <dt>Size</dt> <dd>${item.size_formatted}</dd> <dt>Date Modified</dt> <dd>${item.modified_at_formatted}</dd> <dt>Date Created</dt> <dd>${item.created_at_formatted}</dd> </dl> `;
+            showToast(result.message);
+            updateUIOnItemChange([draggedItemId]);
+        }
+    }
+});
+
+function setViewMode(mode) {
+    G.viewMode = mode;
+    localStorage.setItem('viewMode', mode);
+    const container = $('#file-list-container');
+    if (container) {
+        if (mode === 'grid') {
+            container.classList.add('grid-view');
+            $('#grid-view-btn').style.display = 'none';
+            $('#list-view-btn').style.display = 'flex';
         } else {
-            body.innerHTML = `<p style="padding:20px; color:var(--danger-color);">${result.message}</p>`;
+            container.classList.remove('grid-view');
+            $('#list-view-btn').style.display = 'none';
+            $('#grid-view-btn').style.display = 'flex';
         }
     }
+}
 
-    function closeDetailsPanel() {
-        $('#details-panel').classList.remove('active');
-        $('.main-content').classList.remove('details-panel-active');
-    }
+function batchDownloadSelected() {
+    const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
+    if (selectedIds.length === 0) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'api.php';
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'download_archive';
+    form.appendChild(actionInput);
+    selectedIds.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'ids[]';
+        input.value = id;
+        form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
 
-    function debounce(func, delay) {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), delay);
-        };
+function batchDeleteSelectedWrapper(isPermanent, id) {
+    // Tái sử dụng logic của batchDeleteSelected bằng cách giả lập việc chọn item
+    $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
+    const itemElement = $(`.selectable[data-id="${id}"]`);
+    if (itemElement) {
+        itemElement.classList.add('selected');
+        batchDeleteSelected(isPermanent);
     }
-    async function performLiveSearch(query) {
-        const resultsContainer = $('#live-search-results');
-        if (query.length < 2) {
-            resultsContainer.style.display = 'none';
-            return;
+}
+
+function batchRestoreSelectedWrapper(id) {
+    showConfirmModal('Confirm Restore', 'Are you sure you want to restore this item?', async () => {
+        const result = await apiCall('restore', {
+            ids: [id]
+        });
+        if (result.success) {
+            showToast(result.message);
+            navigateToPath('?view=trash', true);
         }
-        resultsContainer.style.display = 'block';
-        resultsContainer.innerHTML =
+    });
+}
+async function openDetailsPanel(itemId) {
+    const panel = $('#details-panel');
+    const body = $('#details-panel-body');
+    panel.classList.add('active');
+    $('.main-content').classList.add('details-panel-active');
+    body.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    const result = await apiCall('get_details', {
+        id: itemId
+    });
+    if (result.success) {
+        const item = result.item;
+        const fileInfo = getFileIconJS(item.name, item.type === 'folder');
+        const previewHTML = item.preview_url ? `<img src="${item.preview_url}" alt="Preview">` :
+            `<i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i>`;
+        body.innerHTML =
+            ` <div class="details-preview">${previewHTML}</div> <dl class="details-info-list"> <dt>Name</dt> <dd>${escapeHtml(item.name)}</dd> <dt>Kind</dt> <dd>${escapeHtml(item.kind)}</dd> <dt>Size</dt> <dd>${item.size_formatted}</dd> <dt>Date Modified</dt> <dd>${item.modified_at_formatted}</dd> <dt>Date Created</dt> <dd>${item.created_at_formatted}</dd> </dl> `;
+    } else {
+        body.innerHTML = `<p style="padding:20px; color:var(--danger-color);">${result.message}</p>`;
+    }
+}
+
+function closeDetailsPanel() {
+    $('#details-panel').classList.remove('active');
+    $('.main-content').classList.remove('details-panel-active');
+}
+
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+async function performLiveSearch(query) {
+    const resultsContainer = $('#live-search-results');
+    if (query.length < 2) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+    resultsContainer.style.display = 'block';
+    resultsContainer.innerHTML =
         '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
-        const result = await apiCall('live_search', {
-            q: query
-        });
-        if (result.success && result.items.length > 0) {
-            resultsContainer.innerHTML = result.items.map(item => {
-                const fileInfo = getFileIconJS(item.name, item.type === 'folder');
-                const link = item.type === 'folder' ?
-                    `?view=browse&path=${encodeURIComponent(item.full_path + '/' + item.name)}` :
-                    `?view=browse&path=${encodeURIComponent(item.full_path)}`;
-                return ` <a href="${link}" class="live-search-item"> <i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i> <div class="live-search-item-info"> <div class="name">${escapeHtml(item.name)}</div> <div class="path">/${escapeHtml(item.full_path)}</div> </div> </a> `;
-            }).join('');
-        } else {
-            resultsContainer.innerHTML =
-                '<div style="padding:15px; color:var(--text-secondary);">No results found.</div>';
-        }
+    const result = await apiCall('live_search', {
+        q: query
+    });
+    if (result.success && result.items.length > 0) {
+        resultsContainer.innerHTML = result.items.map(item => {
+            const fileInfo = getFileIconJS(item.name, item.type === 'folder');
+            const link = item.type === 'folder' ?
+                `?view=browse&path=${encodeURIComponent(item.full_path + '/' + item.name)}` :
+                `?view=browse&path=${encodeURIComponent(item.full_path)}`;
+            return ` <a href="${link}" class="live-search-item"> <i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i> <div class="live-search-item-info"> <div class="name">${escapeHtml(item.name)}</div> <div class="path">/${escapeHtml(item.full_path)}</div> </div> </a> `;
+        }).join('');
+    } else {
+        resultsContainer.innerHTML =
+            '<div style="padding:15px; color:var(--text-secondary);">No results found.</div>';
     }
+}
 
-    function hideLiveSearch() {
-        setTimeout(() => {
-            $('#live-search-results').style.display = 'none';
-        }, 200);
+function hideLiveSearch() {
+    setTimeout(() => {
+        $('#live-search-results').style.display = 'none';
+    }, 200);
+}
+
+function openModal(id) {
+    $(`#${id}`).classList.add('show');
+}
+
+function closeModal(id) {
+    const modal = $(`#${id}`);
+    if (!modal) return;
+    modal.classList.remove('show');
+    if (id === 'previewModal' && G.plyrInstance) {
+        G.plyrInstance.destroy();
+        G.plyrInstance = null;
+        $('#previewContent').innerHTML = '';
     }
+}
 
-    function openModal(id) {
-        $(`#${id}`).classList.add('show');
+function toggleTheme() {
+    const isLight = document.body.classList.toggle('light-mode');
+    document.cookie = `theme=${isLight ? 'light' : 'dark'}; path=/; max-age=31536000`;
+    if (G.storageChartInstance) {
+        G.storageChartInstance.destroy();
+        G.storageChartInstance = null;
+        renderStorageChart();
     }
+}
+const sidebar = $('.sidebar'),
+    overlay = $('#overlay');
 
-    function closeModal(id) {
-        const modal = $(`#${id}`);
-        if (!modal) return;
-        modal.classList.remove('show');
-        if (id === 'previewModal' && G.plyrInstance) {
-            G.plyrInstance.destroy();
-            G.plyrInstance = null;
-            $('#previewContent').innerHTML = '';
-        }
+function toggleSidebar() {
+    sidebar.classList.toggle('active');
+    overlay.classList.toggle('active');
+}
+
+function openNewFolderModal() {
+    openModal('newFolderModal');
+    $('#folderName').focus();
+}
+
+function showConfirmModal(title, message, onConfirmCallback) {
+    $('#confirmModalTitle').textContent = title;
+    $('#confirmModalMessage').textContent = message;
+    const confirmBtn = $('#confirmModalButton');
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.addEventListener('click', () => {
+        closeModal('confirmModal');
+        onConfirmCallback();
+    });
+    openModal('confirmModal');
+}
+
+function showUserInfoModal() {
+    openModal('userInfoModal');
+    setTimeout(() => {
+        if (!G.storageChartInstance) renderStorageChart();
+    }, 100);
+}
+
+function renderStorageChart() {
+    const storageData = <?php echo json_encode($storageBreakdownForJs); ?>;
+    const ctx = document.getElementById('storageChart').getContext('2d');
+    const isDarkMode = !document.body.classList.contains('light-mode');
+    const textColor = isDarkMode ? 'rgba(240, 240, 240, 0.8)' : 'rgba(28, 28, 30, 0.8)';
+    if (G.storageChartInstance) G.storageChartInstance.destroy();
+    if (storageData.labels.length === 0) {
+        $('#storageChartContainer').innerHTML =
+            '<p style="text-align:center; color: var(--text-secondary); padding-top: 50px;">No file data to display.</p>';
+        return;
     }
-
-    function toggleTheme() {
-        const isLight = document.body.classList.toggle('light-mode');
-        document.cookie = `theme=${isLight ? 'light' : 'dark'}; path=/; max-age=31536000`;
-        if (G.storageChartInstance) {
-            G.storageChartInstance.destroy();
-            G.storageChartInstance = null;
-            renderStorageChart();
-        }
-    }
-    const sidebar = $('.sidebar'),
-        overlay = $('#overlay');
-
-    function toggleSidebar() {
-        sidebar.classList.toggle('active');
-        overlay.classList.toggle('active');
-    }
-
-    function openNewFolderModal() {
-        openModal('newFolderModal');
-        $('#folderName').focus();
-    }
-
-    function showConfirmModal(title, message, onConfirmCallback) {
-        $('#confirmModalTitle').textContent = title;
-        $('#confirmModalMessage').textContent = message;
-        const confirmBtn = $('#confirmModalButton');
-        const newConfirmBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-        newConfirmBtn.addEventListener('click', () => {
-            closeModal('confirmModal');
-            onConfirmCallback();
-        });
-        openModal('confirmModal');
-    }
-
-    function showUserInfoModal() {
-        openModal('userInfoModal');
-        setTimeout(() => {
-            if (!G.storageChartInstance) renderStorageChart();
-        }, 100);
-    }
-
-    function renderStorageChart() {
-        const storageData = <?php echo json_encode($storageBreakdownForJs); ?>;
-        const ctx = document.getElementById('storageChart').getContext('2d');
-        const isDarkMode = !document.body.classList.contains('light-mode');
-        const textColor = isDarkMode ? 'rgba(240, 240, 240, 0.8)' : 'rgba(28, 28, 30, 0.8)';
-        if (G.storageChartInstance) G.storageChartInstance.destroy();
-        if (storageData.labels.length === 0) {
-            $('#storageChartContainer').innerHTML =
-                '<p style="text-align:center; color: var(--text-secondary); padding-top: 50px;">No file data to display.</p>';
-            return;
-        }
-        G.storageChartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: storageData.labels,
-                datasets: [{
-                    data: storageData.data,
-                    backgroundColor: ['#0a84ff', '#5ac8fa', '#ff9500', '#ff3b30', '#34c759', '#ffcc00',
-                        '#af52de', '#5856d6'
-                    ],
-                    borderColor: isDarkMode ? '#1d1d20' : '#ffffff',
-                    borderWidth: 3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            color: textColor,
-                            padding: 15,
-                            font: {
-                                size: 13
-                            }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (c) => `${c.label || ''}: ${formatBytesJS(c.parsed || 0)}`
+    G.storageChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: storageData.labels,
+            datasets: [{
+                data: storageData.data,
+                backgroundColor: ['#0a84ff', '#5ac8fa', '#ff9500', '#ff3b30', '#34c759', '#ffcc00',
+                    '#af52de', '#5856d6'
+                ],
+                borderColor: isDarkMode ? '#1d1d20' : '#ffffff',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: textColor,
+                        padding: 15,
+                        font: {
+                            size: 13
                         }
                     }
                 },
-                cutout: '70%'
+                tooltip: {
+                    callbacks: {
+                        label: (c) => `${c.label || ''}: ${formatBytesJS(c.parsed || 0)}`
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+}
+
+function openRenameModal(id, oldName, type) {
+    openModal('renameModal');
+    $('#renameItemId').value = id;
+    const input = $('#newName');
+    if (type === 'file') {
+        const lastDot = oldName.lastIndexOf('.');
+        input.value = lastDot > 0 ? oldName.substring(0, lastDot) : oldName;
+    } else {
+        input.value = oldName;
+    }
+    input.focus();
+    input.select();
+}
+// --- THAY THẾ CÁC HÀM CŨ BẰNG CÁC HÀM MỚI NÀY ---
+
+/**
+ * Mở modal chia sẻ, lấy thông tin hiện tại của link và điền vào form
+ */
+async function openShareModal(fileId) {
+    openModal('shareModal');
+    $('#shareFileId').value = fileId;
+
+    const linkSection = $('#share-link-section');
+    const createSection = $('#create-share-link-section');
+    const optionsSection = $('#share-options-section');
+    const removeBtn = $('#removeShareLinkBtn');
+    const saveBtn = $('#saveShareSettingsBtn');
+    const linkInput = $('#shareLinkInput');
+
+    // Reset and show loading state
+    linkSection.style.display = 'none';
+    createSection.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    optionsSection.style.display = 'none';
+    removeBtn.style.display = 'none';
+    saveBtn.textContent = 'Save & Create Link';
+    $('#share-modal-body').querySelectorAll('input').forEach(i => {
+        if (i.type === 'checkbox') i.checked = true;
+        else if (i.type !== 'hidden') i.value = '';
+    });
+
+    const result = await apiCall('get_share_details', {
+        file_id: fileId
+    });
+
+    if (result.success && result.details) {
+        // Link đã tồn tại
+        linkSection.style.display = 'block';
+        createSection.style.display = 'none';
+        optionsSection.style.display = 'block';
+        removeBtn.style.display = 'block';
+        saveBtn.textContent = 'Update Settings';
+
+        linkInput.value = `${G.BASE_URL}share.php?id=${result.details.id}`;
+        $('#sharePassword').placeholder = result.details.has_password ?
+            'Password is set. Enter new to change.' : 'Protect with a password';
+        $('#shareExpiry').value = result.details.expires_at ? result.details.expires_at.split(' ')[0] : '';
+        $('#shareAllowDownload').checked = result.details.allow_download == 1;
+    } else {
+        // Link chưa tồn tại
+        createSection.innerHTML = '<p>This file is not currently shared.</p>';
+        createSection.style.display = 'block';
+        optionsSection.style.display = 'block'; // Vẫn hiện option để tạo link mới
+    }
+}
+
+/**
+ * Lưu các cài đặt chia sẻ
+ */
+async function saveShareSettings() {
+    const fileId = $('#shareFileId').value;
+    const password = $('#sharePassword').value;
+    const expires_at = $('#shareExpiry').value;
+    const allow_download = $('#shareAllowDownload').checked ? 1 : 0;
+
+    const data = {
+        file_id: fileId,
+        allow_download: allow_download
+    };
+    if (password) data.password = password;
+    if (expires_at) data.expires_at = expires_at;
+
+    const result = await apiCall('update_share_link', data);
+    if (result.success) {
+        showToast('Share settings saved!');
+        $('#shareLinkInput').value = `${G.BASE_URL}share.php?id=${result.share_id}`;
+        $('#share-link-section').style.display = 'block';
+        $('#create-share-link-section').style.display = 'none';
+        $('#removeShareLinkBtn').style.display = 'block';
+        $('#saveShareSettingsBtn').textContent = 'Update Settings';
+        $('#sharePassword').value = ''; // Xóa trường pass sau khi lưu
+        $('#sharePassword').placeholder = password ? 'Password is set. Enter new to change.' :
+            'Protect with a password';
+    }
+}
+
+/**
+ * Xóa link chia sẻ
+ */
+async function removeShareLink() {
+    const fileId = $('#shareFileId').value;
+    showConfirmModal('Remove Share Link',
+        'Are you sure you want to remove this share link? This will make the link invalid.', async () => {
+            const result = await apiCall('remove_share_link', {
+                file_id: fileId
+            });
+            if (result.success) {
+                showToast(result.message);
+                closeModal('shareModal');
             }
         });
+}
+
+function copyShareLink() {
+    const input = $('#shareLinkInput');
+    if (!input.value) return;
+    input.select();
+    document.execCommand('copy');
+    showToast('Link copied to clipboard!', 'info');
+}
+
+function toggleSelectAll(isChecked) {
+    $$('.selectable').forEach(el => {
+        el.classList.toggle('selected', isChecked);
+        const checkbox = el.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = isChecked;
+    });
+    updateToolbarState();
+    if (isChecked && $$('.selectable').length > 0) {
+        openDetailsPanel($$('.selectable')[0].dataset.id);
+    } else {
+        closeDetailsPanel();
+    }
+}
+
+function escapeJS(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+const CHUNK_SIZE = 2 * 1024 * 1024,
+    MAX_PARALLEL_UPLOADS = 4,
+    MAX_RETRIES = 3;
+let parentIdForUpload = G.currentFolderId;
+
+function openUploadModal() {
+    parentIdForUpload = G.currentFolderId;
+    openModal('uploadModal');
+}
+const dropZone = $('#drop-zone'),
+    fileInput = $('#file-input-chunk'),
+    progressList = $('#upload-progress-list');
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFiles(fileInput.files);
+    fileInput.value = '';
+});
+
+function handleFiles(files) {
+    for (const file of files) uploadFile(file);
+}
+
+function createProgressItem(file) {
+    const fileInfo = getFileIconJS(file.name);
+    const item = document.createElement('div');
+    item.className = 'progress-item';
+    item.innerHTML =
+        `<i class="fas ${fileInfo.icon} file-icon" style="color: ${fileInfo.color};"></i><div class="progress-info"><div class="file-name">${escapeHtml(file.name)}</div><div class="progress-bar-container"><div class="progress-bar"></div></div><div class="progress-status">Initializing...</div></div><div class="status-icon"></div>`;
+    progressList.appendChild(item);
+    return item;
+}
+async function uploadFile(file) {
+    const item = createProgressItem(file),
+        bar = item.querySelector('.progress-bar'),
+        status = item.querySelector('.progress-status'),
+        icon = item.querySelector('.status-icon');
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    status.textContent = 'Preparing...';
+    const startData = {
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        parentId: parentIdForUpload
+    };
+    const startResult = await apiCall('start_upload', startData);
+    if (!startResult.success) {
+        status.textContent = 'Error: ' + startResult.message;
+        icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
+        return;
+    }
+    const fileId = startResult.fileId;
+    const chunkQueue = Array.from({
+        length: totalChunks
+    }, (_, i) => i);
+    let progress = 0;
+    const uploadWorker = async () => {
+        while (chunkQueue.length > 0) {
+            const chunkIndex = chunkQueue.shift();
+            let retries = 0;
+            while (retries < MAX_RETRIES) {
+                try {
+                    const start = chunkIndex * CHUNK_SIZE;
+                    const chunk = file.slice(start, start + CHUNK_SIZE);
+                    const chunkResult = await apiCall('upload_chunk', {
+                        fileId: fileId,
+                        chunkIndex: chunkIndex,
+                        chunk: chunk
+                    });
+                    if (!chunkResult.success) throw new Error(chunkResult.message);
+                    progress++;
+                    updateProgress(progress, totalChunks, bar, status);
+                    break;
+                } catch (e) {
+                    retries++;
+                    if (retries >= MAX_RETRIES) throw new Error(`Chunk ${chunkIndex + 1} failed.`);
+                    await new Promise(r => setTimeout(r, 1000 * retries));
+                }
+            }
+        }
+    };
+    const workers = Array(MAX_PARALLEL_UPLOADS).fill(null).map(uploadWorker);
+    try {
+        await Promise.all(workers);
+    } catch (e) {
+        status.textContent = 'Upload failed: ' + e.message;
+        icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
+        return;
+    }
+    status.textContent = 'Assembling file...';
+    const completeResult = await apiCall('complete_upload', {
+        fileId: fileId,
+        totalChunks: totalChunks
+    });
+    if (completeResult.success) {
+        status.textContent = 'Complete!';
+        icon.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success-color)"></i>`;
+        setTimeout(() => {
+            if ($('#uploadModal').classList.contains('show')) navigateToPath(window.location.search,
+                true);
+        }, 1200);
+    } else {
+        status.textContent = 'Finalization failed: ' + completeResult.message;
+        icon.innerHTML = `<i class="fas fa-exclamation-circle" style="color:var(--danger-color)"></i>`;
+    }
+}
+
+function updateProgress(chunkNum, totalChunks, bar, status) {
+    const percent = totalChunks > 0 ? Math.round((chunkNum / totalChunks) * 100) : 100;
+    bar.style.width = `${percent}%`;
+    status.textContent = `Uploading... ${percent}%`;
+}
+
+function getFileIconJS(name, isFolder = false) {
+    if (isFolder) {
+        return {
+            icon: 'fa-folder',
+            color: '#5ac8fa'
+        };
+    }
+    const ext = name.split('.').pop().toLowerCase();
+    const map = {
+        pdf: {
+            i: 'fa-file-pdf',
+            c: '#e62e2e'
+        },
+        doc: {
+            i: 'fa-file-word',
+            c: '#2a5699'
+        },
+        docx: {
+            i: 'fa-file-word',
+            c: '#2a5699'
+        },
+        zip: {
+            i: 'fa-file-archive',
+            c: '#f0ad4e'
+        },
+        rar: {
+            i: 'fa-file-archive',
+            c: '#f0ad4e'
+        },
+        jpg: {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        png: {
+            i: 'fa-file-image',
+            c: '#5cb85c'
+        },
+        mp4: {
+            i: 'fa-file-video',
+            c: '#6c5b7b'
+        },
+        mp3: {
+            i: 'fa-file-audio',
+            c: '#c06c84'
+        }
+    };
+    return map[ext] ? {
+        icon: map[ext].i,
+        color: map[ext].c
+    } : {
+        icon: 'fa-file',
+        color: '#8a8a8e'
+    };
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+function formatBytesJS(bytes, decimals = 2) {
+    if (bytes === 0 || !bytes) return '0 B';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+async function renderPdf(url) {
+    const {
+        pdfjsLib
+    } = globalThis;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `./src/js/pdf.worker.mjs`;
+    const pdfDoc = await pdfjsLib.getDocument(url).promise;
+    const viewer = $('#pdf-viewer-container');
+    viewer.innerHTML = '';
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({
+            scale: 1.5
+        });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        canvas.style.marginBottom = '10px';
+        viewer.appendChild(canvas);
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sessionMessage = <?php echo !empty($session_message)
+        ? $session_message
+        : "null"; ?>;
+    if (sessionMessage) {
+        showToast(sessionMessage.text, sessionMessage.type);
     }
 
-    function openRenameModal(id, oldName, type) {
-        openModal('renameModal');
-        $('#renameItemId').value = id;
-        const input = $('#newName');
-        if (type === 'file') {
-            const lastDot = oldName.lastIndexOf('.');
-            input.value = lastDot > 0 ? oldName.substring(0, lastDot) : oldName;
-        } else {
-            input.value = oldName;
+    navigateToPath(
+        `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`,
+        true);
+
+    document.body.addEventListener('click', e => {
+        const link = e.target.closest('a');
+        if (link && link.href.includes(G.BASE_URL) && !link.href.includes('download_file') && !link
+            .target) {
+            const url = new URL(link.href);
+            if (url.searchParams.has('view')) {
+                e.preventDefault();
+                navigateToPath(link.search);
+            }
         }
-        input.focus();
-        input.select();
-    }
-    async function openShareModal(id, shareId = '') {
-        openModal('shareModal');
-        const linkInput = $('#shareLinkInput'),
-            statusMsg = $('#shareStatusMessage');
-        linkInput.value = 'Generating...';
-        statusMsg.textContent = '';
-        if (shareId) {
-            linkInput.value = `${G.BASE_URL}share.php?id=${shareId}`;
-            return;
-        }
-        const result = await apiCall('create_share_link', {
-            file_id: id
+    });
+
+    window.addEventListener('popstate', e => {
+        const initialUrl =
+            `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`;
+        navigateToPath(e.state && e.state.path ? e.state.path : initialUrl, true);
+    });
+
+    $('.search-form-desktop').addEventListener('submit', e => {
+        e.preventDefault();
+        const query = e.target.q.value;
+        hideLiveSearch();
+        navigateToPath(`?view=search&q=${encodeURIComponent(query)}`);
+    });
+    $('.search-form-mobile').addEventListener('submit', e => {
+        e.preventDefault();
+        const query = e.target.q.value;
+        navigateToPath(`?view=search&q=${encodeURIComponent(query)}`);
+    });
+
+    $('#newFolderForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const result = await apiCall('new_folder', {
+            folder_name: form.folder_name.value,
+            parent_id: form.parent_id.value
         });
         if (result.success) {
-            linkInput.value = `${G.BASE_URL}share.php?id=${result.share_id}`;
-        } else {
-            linkInput.value = 'Error generating link.';
-            statusMsg.textContent = result.message;
+            closeModal('newFolderModal');
+            showToast(`Folder created.`);
+            updateUIOnItemChange([], [result.item]);
+            form.reset();
         }
-    }
-
-    function copyShareLink() {
-        const input = $('#shareLinkInput');
-        input.select();
-        document.execCommand('copy');
-        $('#shareStatusMessage').textContent = 'Copied!';
-        setTimeout(() => $('#shareStatusMessage').textContent = '', 2000);
-    }
-    async function openPreviewModal(name, id) {
-        openModal('previewModal');
-        const title = $('#previewModalTitle'),
-            content = $('#previewContent');
-        title.textContent = name;
-        content.innerHTML =
-            '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-        const d = await apiCall('get_preview_data', {
-            id: id
+    });
+    $('#renameForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const result = await apiCall('rename', {
+            id: form.id.value,
+            new_name: form.new_name.value
         });
-        if (!d.success) {
-            content.innerHTML = `<p style="padding:20px;">${d.message}</p>`;
-            return;
+        if (result.success) {
+            closeModal('renameModal');
+            showToast('Item renamed.');
+            navigateToPath(window.location.search, true);
+            form.reset();
         }
-        let html = '';
-        switch (d.type) {
-            case 'image':
-                html = `<img src="${d.data}" alt="${name}">`;
-                break;
-            case 'video':
-                html =
-                    `<video id="media-player" playsinline controls><source src="${d.data}" type="${d.mime_type}"></video>`;
-                break;
-            case 'audio':
-                html = `<audio id="media-player" controls><source src="${d.data}" type="${d.mime_type}"></audio>`;
-                break;
-            case 'pdf':
-                html = `<div id="pdf-viewer-container"><canvas id="pdf-canvas"></canvas></div>`;
-                break;
-            case 'code':
-                html =
-                    `<pre class="line-numbers" style="width:100%;height:100%;margin:0;max-height:calc(90vh - 55px);"><code class="language-${d.language}">${escapeHtml(d.data)}</code></pre>`;
-                break;
-            default:
-                html =
-                    `<div style="text-align:center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-file fa-3x" style="margin-bottom: 15px;"></i><p>No preview available for <strong>${escapeHtml(d.data.name)}</strong>.</p><p>Size: ${d.data.size}</p></div>`;
-                break;
-        }
-        content.innerHTML = html;
-        if (d.type === 'video' || d.type === 'audio') {
-            G.plyrInstance = new Plyr('#media-player', {
-                autoplay: true
-            });
-        } else if (d.type === 'code') {
-            Prism.highlightAllUnder(content);
-        } else if (d.type === 'pdf') {
-            renderPdf(d.data);
-        }
-    }
+    });
 
-    function toggleSelectAll(isChecked) {
-        $$('.selectable').forEach(el => {
-            el.classList.toggle('selected', isChecked);
-            const checkbox = el.querySelector('input[type="checkbox"]');
-            if (checkbox) checkbox.checked = isChecked;
-        });
+    const mainContentArea = $('.content-area');
+    mainContentArea.addEventListener('click', (e) => {
+        const item = e.target.closest('.selectable');
+        if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay') || (e
+                .target.closest('.grid-item') && e.target.closest('.grid-item').getAttribute(
+                    'onclick'))) return;
+        if (!e.ctrlKey && !e.shiftKey) {
+            $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
+        }
+        item.classList.toggle('selected');
+        const checkbox = item.querySelector(`input[type="checkbox"]`);
+        if (checkbox) checkbox.checked = item.classList.contains('selected');
         updateToolbarState();
-        if (isChecked && $$('.selectable').length > 0) {
-            openDetailsPanel($$('.selectable')[0].dataset.id);
+        if ($$('.selectable.selected').length === 1) {
+            openDetailsPanel(item.dataset.id);
         } else {
             closeDetailsPanel();
         }
-    }
-
-    function escapeJS(str) {
-        return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    }
-    const CHUNK_SIZE = 2 * 1024 * 1024,
-        MAX_PARALLEL_UPLOADS = 4,
-        MAX_RETRIES = 3;
-    let parentIdForUpload = G.currentFolderId;
-
-    function openUploadModal() {
-        parentIdForUpload = G.currentFolderId;
-        openModal('uploadModal');
-    }
-    const dropZone = $('#drop-zone'),
-        fileInput = $('#file-input-chunk'),
-        progressList = $('#upload-progress-list');
-    dropZone.addEventListener('dragover', e => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
     });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', e => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    mainContentArea.addEventListener('dblclick', (e) => {
+        const item = e.target.closest('.selectable');
+        if (!item) return;
+        if (item.dataset.type === 'folder' && G.currentPage === 'browse') {
+            const link = item.querySelector('a');
+            if (link) {
+                navigateToPath(link.search);
+            }
+        } else if (item.dataset.type === 'file') {
+            openPreviewModal(item.dataset.name, item.dataset.id);
+        }
     });
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length) handleFiles(fileInput.files);
-        fileInput.value = '';
-    });
-
-    function handleFiles(files) {
-        for (const file of files) uploadFile(file);
-    }
-
-    function createProgressItem(file) {
-        const fileInfo = getFileIconJS(file.name);
-        const item = document.createElement('div');
-        item.className = 'progress-item';
-        item.innerHTML =
-            `<i class="fas ${fileInfo.icon} file-icon" style="color: ${fileInfo.color};"></i><div class="progress-info"><div class="file-name">${escapeHtml(file.name)}</div><div class="progress-bar-container"><div class="progress-bar"></div></div><div class="progress-status">Initializing...</div></div><div class="status-icon"></div>`;
-        progressList.appendChild(item);
-        return item;
-    }
-    async function uploadFile(file) {
-        const item = createProgressItem(file),
-            bar = item.querySelector('.progress-bar'),
-            status = item.querySelector('.progress-status'),
-            icon = item.querySelector('.status-icon');
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-        status.textContent = 'Preparing...';
-        const startData = {
-            fileName: file.name,
-            fileSize: file.size,
-            mimeType: file.type,
-            parentId: parentIdForUpload
-        };
-        const startResult = await apiCall('start_upload', startData);
-        if (!startResult.success) {
-            status.textContent = 'Error: ' + startResult.message;
-            icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
-            return;
-        }
-        const fileId = startResult.fileId;
-        const chunkQueue = Array.from({
-            length: totalChunks
-        }, (_, i) => i);
-        let progress = 0;
-        const uploadWorker = async () => {
-            while (chunkQueue.length > 0) {
-                const chunkIndex = chunkQueue.shift();
-                let retries = 0;
-                while (retries < MAX_RETRIES) {
-                    try {
-                        const start = chunkIndex * CHUNK_SIZE;
-                        const chunk = file.slice(start, start + CHUNK_SIZE);
-                        const chunkResult = await apiCall('upload_chunk', {
-                            fileId: fileId,
-                            chunkIndex: chunkIndex,
-                            chunk: chunk
-                        });
-                        if (!chunkResult.success) throw new Error(chunkResult.message);
-                        progress++;
-                        updateProgress(progress, totalChunks, bar, status);
-                        break;
-                    } catch (e) {
-                        retries++;
-                        if (retries >= MAX_RETRIES) throw new Error(`Chunk ${chunkIndex + 1} failed.`);
-                        await new Promise(r => setTimeout(r, 1000 * retries));
-                    }
-                }
-            }
-        };
-        const workers = Array(MAX_PARALLEL_UPLOADS).fill(null).map(uploadWorker);
-        try {
-            await Promise.all(workers);
-        } catch (e) {
-            status.textContent = 'Upload failed: ' + e.message;
-            icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
-            return;
-        }
-        status.textContent = 'Assembling file...';
-        const completeResult = await apiCall('complete_upload', {
-            fileId: fileId,
-            totalChunks: totalChunks
-        });
-        if (completeResult.success) {
-            status.textContent = 'Complete!';
-            icon.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success-color)"></i>`;
-            setTimeout(() => {
-                if ($('#uploadModal').classList.contains('show')) navigateToPath(window.location.search,
-                    true);
-            }, 1200);
-        } else {
-            status.textContent = 'Finalization failed: ' + completeResult.message;
-            icon.innerHTML = `<i class="fas fa-exclamation-circle" style="color:var(--danger-color)"></i>`;
-        }
-    }
-
-    function updateProgress(chunkNum, totalChunks, bar, status) {
-        const percent = totalChunks > 0 ? Math.round((chunkNum / totalChunks) * 100) : 100;
-        bar.style.width = `${percent}%`;
-        status.textContent = `Uploading... ${percent}%`;
-    }
-
-    function getFileIconJS(name, isFolder = false) {
-        if (isFolder) {
-            return {
-                icon: 'fa-folder',
-                color: '#5ac8fa'
-            };
-        }
-        const ext = name.split('.').pop().toLowerCase();
-        const map = {
-            pdf: {
-                i: 'fa-file-pdf',
-                c: '#e62e2e'
-            },
-            doc: {
-                i: 'fa-file-word',
-                c: '#2a5699'
-            },
-            docx: {
-                i: 'fa-file-word',
-                c: '#2a5699'
-            },
-            zip: {
-                i: 'fa-file-archive',
-                c: '#f0ad4e'
-            },
-            rar: {
-                i: 'fa-file-archive',
-                c: '#f0ad4e'
-            },
-            jpg: {
-                i: 'fa-file-image',
-                c: '#5cb85c'
-            },
-            png: {
-                i: 'fa-file-image',
-                c: '#5cb85c'
-            },
-            mp4: {
-                i: 'fa-file-video',
-                c: '#6c5b7b'
-            },
-            mp3: {
-                i: 'fa-file-audio',
-                c: '#c06c84'
-            }
-        };
-        return map[ext] ? {
-            icon: map[ext].i,
-            color: map[ext].c
-        } : {
-            icon: 'fa-file',
-            color: '#8a8a8e'
-        };
-    }
-
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return String(text).replace(/[&<>"']/g, m => map[m]);
-    }
-
-    function formatBytesJS(bytes, decimals = 2) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-    }
-    async function renderPdf(url) {
-        const {
-            pdfjsLib
-        } = globalThis;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `./src/js/pdf.worker.mjs`;
-        const pdfDoc = await pdfjsLib.getDocument(url).promise;
-        const viewer = $('#pdf-viewer-container');
-        viewer.innerHTML = '';
-        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-            const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({
-                scale: 1.5
-            });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            canvas.style.marginBottom = '10px';
-            viewer.appendChild(canvas);
-            await page.render({
-                canvasContext: context,
-                viewport: viewport
-            }).promise;
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const sessionMessage = <?php echo !empty($session_message) ? $session_message : 'null'; ?>;
-        if (sessionMessage) {
-            showToast(sessionMessage.text, sessionMessage.type);
-        }
-
-        navigateToPath(
-            `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`,
-            true);
-
-        document.body.addEventListener('click', e => {
-            const link = e.target.closest('a');
-            const gridItemFolder = e.target.closest('.grid-item[data-type="folder"]');
-
-            if (gridItemFolder && !e.target.closest('input, label')) { // Handle grid item folder clicks
-                e.preventDefault();
-                gridItemFolder.click(); // Trigger the onclick attached to the element
-                return;
-            }
-
-            if (link && link.href.includes(G.BASE_URL) && !link.href.includes('download_file') && !link
-                .target) {
-                const url = new URL(link.href);
-                if (url.searchParams.has('view')) {
-                    e.preventDefault();
-                    navigateToPath(link.search);
-                }
-            }
-        });
-
-        window.addEventListener('popstate', e => {
-            const initialUrl =
-                `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`;
-            navigateToPath(e.state && e.state.path ? e.state.path : initialUrl, true);
-        });
-
-        $('.search-form-desktop').addEventListener('submit', e => {
+    mainContentArea.addEventListener('contextmenu', e => {
+        const item = e.target.closest('.selectable');
+        if (item) {
             e.preventDefault();
-            const query = e.target.q.value;
-            hideLiveSearch();
-            navigateToPath(`?view=search&q=${encodeURIComponent(query)}`);
-        });
-        $('.search-form-mobile').addEventListener('submit', e => {
-            e.preventDefault();
-            const query = e.target.q.value;
-            navigateToPath(`?view=search&q=${encodeURIComponent(query)}`);
-        });
-
-        $('#newFolderForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            const result = await apiCall('new_folder', {
-                folder_name: form.folder_name.value,
-                parent_id: form.parent_id.value
-            });
-            if (result.success) {
-                closeModal('newFolderModal');
-                showToast(`Folder created.`);
-                updateUIOnItemChange([], [result.item]);
-                form.reset();
-            }
-        });
-        $('#renameForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            const result = await apiCall('rename', {
-                id: form.id.value,
-                new_name: form.new_name.value
-            });
-            if (result.success) {
-                closeModal('renameModal');
-                showToast('Item renamed.');
-                navigateToPath(window.location.search, true);
-                form.reset();
-            }
-        });
-
-        const mainContentArea = $('.content-area');
-        mainContentArea.addEventListener('click', (e) => {
-            const item = e.target.closest('.selectable');
-            if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay')) return;
-            if (!e.ctrlKey && !e.shiftKey) {
+            if (!item.classList.contains('selected')) {
                 $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
-            }
-            item.classList.toggle('selected');
-            const checkbox = item.querySelector(`input[type="checkbox"]`);
-            if (checkbox) checkbox.checked = item.classList.contains('selected');
-            updateToolbarState();
-            if ($$('.selectable.selected').length === 1) {
+                item.classList.add('selected');
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = true;
+                updateToolbarState();
                 openDetailsPanel(item.dataset.id);
-            } else {
-                closeDetailsPanel();
             }
-        });
-        mainContentArea.addEventListener('dblclick', (e) => {
-            const item = e.target.closest('.selectable');
-            if (!item) return;
-            if (item.dataset.type === 'folder' && G.currentPage === 'browse') {
-                const link = item.querySelector('a');
-                if (link) {
-                    navigateToPath(link.search);
-                }
-            } else if (item.dataset.type === 'file') {
-                openPreviewModal(item.dataset.name, item.dataset.id);
-            }
-        });
-        mainContentArea.addEventListener('contextmenu', e => {
-            const item = e.target.closest('.selectable');
-            if (item) {
-                e.preventDefault();
-                if (!item.classList.contains('selected')) {
-                    $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
-                    item.classList.add('selected');
-                    const checkbox = item.querySelector('input[type="checkbox"]');
-                    if (checkbox) checkbox.checked = true;
-                    updateToolbarState();
-                    openDetailsPanel(item.dataset.id);
-                }
-                showActionPopover(item, e);
-            }
-        });
+            showActionPopover(item, e);
+        }
+    });
 
-        const searchInput = $('.search-form-desktop .search-input');
-        const debouncedSearch = debounce(performLiveSearch, 300);
-        searchInput.addEventListener('input', () => {
-            debouncedSearch(searchInput.value);
-        });
-        searchInput.addEventListener('blur', hideLiveSearch);
+    const searchInput = $('.search-form-desktop .search-input');
+    const debouncedSearch = debounce(performLiveSearch, 300);
+    searchInput.addEventListener('input', () => {
+        debouncedSearch(searchInput.value);
+    });
+    searchInput.addEventListener('blur', hideLiveSearch);
 
-        window.addEventListener('click', e => {
-            if (e.target.classList.contains('modal')) closeModal(e.target.id);
-            const popover = $('#actionPopover');
-            if (popover.classList.contains('show') && !e.target.closest('.action-popover') && !e.target
-                .closest('.action-btn')) {
-                popover.classList.remove('show');
-            }
-        });
-        $$('.tab-nav-item').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const tabContainer = tab.closest('.modal-body');
-                tabContainer.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el
-                    .classList.remove('active'));
-                tab.classList.add('active');
-                $('#tab-' + tab.dataset.tab).classList.add('active');
-            });
+    window.addEventListener('click', e => {
+        if (e.target.classList.contains('modal')) closeModal(e.target.id);
+        const popover = $('#actionPopover');
+        if (popover.classList.contains('show') && !e.target.closest('.action-popover') && !e.target
+            .closest('.action-btn')) {
+            popover.classList.remove('show');
+        }
+    });
+    $$('.tab-nav-item').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabContainer = tab.closest('.modal-body');
+            tabContainer.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el
+                .classList.remove('active'));
+            tab.classList.add('active');
+            $('#tab-' + tab.dataset.tab).classList.add('active');
         });
     });
-    </script>
-</body>
+
+    $('#folder-tree-container').addEventListener('click', e => {
+        const folderItem = e.target.closest('.folder-item');
+        if (folderItem) {
+            $$('#folder-tree-container .folder-item').forEach(item => item.classList.remove(
+                'selected'));
+            folderItem.classList.add('selected');
+            G.destinationFolderId = parseInt(folderItem.dataset.id);
+            $('#confirmMoveBtn').disabled = false;
+            const toggleIcon = folderItem.querySelector('.toggle-icon');
+            const sublist = folderItem.nextElementSibling;
+            if (toggleIcon && sublist && sublist.tagName === 'UL') {
+                sublist.style.display = sublist.style.display === 'none' ? 'block' : 'none';
+                toggleIcon.classList.toggle('collapsed');
+            }
+        }
+    });
+    $('#confirmMoveBtn').addEventListener('click', async () => {
+        if (G.itemsToMove.length > 0 && G.destinationFolderId !== null) {
+            const result = await apiCall('move', {
+                item_ids: G.itemsToMove,
+                destination_id: G.destinationFolderId
+            });
+            if (result.success) {
+                showToast(result.message);
+                closeModal('moveModal');
+                navigateToPath(window.location.search, true);
+            }
+        }
+    });
+});
+</script>
 
 </html>

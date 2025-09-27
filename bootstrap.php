@@ -4,6 +4,14 @@
 // This file combines config.php, helpers.php, and auth_check.php
 // =================================================================
 
+// THÊM DÒNG NÀY VÀO NGAY ĐẦU TIÊN
+// Tự động nén output (HTML, JSON, etc.) nếu trình duyệt hỗ trợ
+if (substr_count($_SERVER["HTTP_ACCEPT_ENCODING"], "gzip")) {
+    ob_start("ob_gzhandler");
+} else {
+    ob_start();
+}
+
 // --- 1. CONFIGURATION (from config.php) ---
 
 session_start();
@@ -70,8 +78,9 @@ try {
         $pdo->exec(
             "CREATE TRIGGER update_file_system_modified_at AFTER UPDATE ON file_system FOR EACH ROW BEGIN UPDATE file_system SET modified_at = CURRENT_TIMESTAMP WHERE id = OLD.id; END;"
         );
+        // Bảng share_links được tạo với các cột mới ngay từ đầu
         $pdo->exec(
-            "CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
+            "CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `password` TEXT NULL, `expires_at` TEXT NULL, `allow_download` INTEGER NOT NULL DEFAULT 1, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
         );
         $pdo->exec(
             "CREATE INDEX idx_parent_deleted ON file_system (parent_id, is_deleted);"
@@ -80,6 +89,25 @@ try {
             "INSERT INTO `file_system` (`id`, `name`, `type`, `parent_id`) VALUES (1, 'ROOT', 'folder', NULL)"
         );
         $pdo->commit();
+    } else {
+        // LOGIC NÂNG CẤP DATABASE TỰ ĐỘNG
+        // Kiểm tra và nâng cấp bảng share_links nếu cần thiết
+        $stmt = $pdo->query("PRAGMA table_info(share_links)");
+        $columns = $stmt->fetchAll(PDO::FETCH_COLUMN, 1);
+
+        if (!in_array("password", $columns)) {
+            $pdo->exec("ALTER TABLE share_links ADD COLUMN password TEXT NULL");
+        }
+        if (!in_array("expires_at", $columns)) {
+            $pdo->exec(
+                "ALTER TABLE share_links ADD COLUMN expires_at TEXT NULL"
+            );
+        }
+        if (!in_array("allow_download", $columns)) {
+            $pdo->exec(
+                "ALTER TABLE share_links ADD COLUMN allow_download INTEGER NOT NULL DEFAULT 1"
+            );
+        }
     }
 } catch (\PDOException $e) {
     if (strpos($e->getMessage(), "unable to open database file") !== false) {
@@ -366,23 +394,16 @@ function deleteFolderRecursiveDb($pdo, $folderId)
 
 // --- 3. AUTHENTICATION CHECK (from auth_check.php) ---
 
-// This check runs on every page that includes bootstrap.php, unless IS_PUBLIC_PAGE is defined.
-// Pages like login.php, register.php, share.php will define this constant before including this file.
 if (!defined("IS_PUBLIC_PAGE") || IS_PUBLIC_PAGE !== true) {
-    // 1. Check the main toggle first
     if (AUTH_ENABLED === false) {
-        // If auth is OFF, create a mock session to let the app function
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
         $_SESSION["is_logged_in"] = true;
-        $_SESSION["username"] = "Local User"; // Default username for local mode
-
-        // Skip all other checks and allow access
+        $_SESSION["username"] = "Local User";
         return;
     }
 
-    // 2. If auth is ON, run the normal login check
     if (
         !isset($_SESSION["is_logged_in"]) ||
         $_SESSION["is_logged_in"] !== true

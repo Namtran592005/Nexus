@@ -1,7 +1,5 @@
 <?php
-require_once "bootstrap.php"; // Chỉ cần gọi bootstrap là đủ
-
-// Lấy thông tin chung không đổi
+require_once "bootstrap.php";
 $totalSize =
     $pdo
         ->query(
@@ -12,8 +10,6 @@ $totalSize =
 $totalStorageBytes = TOTAL_STORAGE_GB * 1024 * 1024 * 1024;
 $usagePercentage =
     $totalStorageBytes > 0 ? ($totalSize / $totalStorageBytes) * 100 : 0;
-
-// Lấy dữ liệu cho biểu đồ (chỉ cần 1 lần)
 $stmt = $pdo->query(
     "SELECT mime_type, SUM(size) as total_size FROM file_system WHERE type = 'file' AND is_deleted = 0 GROUP BY mime_type"
 );
@@ -31,18 +27,18 @@ $storageBreakdownForJs = [
     "labels" => array_keys($storageBreakdown),
     "data" => array_values($storageBreakdown),
 ];
-
-// Lấy thông tin view ban đầu từ URL để JS có thể tải lần đầu
 $initial_view = $_GET["view"] ?? "browse";
 $initial_path = $_GET["path"] ?? "";
 $initial_query = $_GET["q"] ?? "";
-
-// Lấy thông báo session
 $session_message = "";
 if (isset($_SESSION["message"])) {
     $session_message = json_encode($_SESSION["message"]);
     unset($_SESSION["message"]);
 }
+$is_impersonating =
+    isset($_SESSION["is_impersonating"]) && $_SESSION["is_impersonating"];
+$current_username = htmlspecialchars($_SESSION["username"]);
+$is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,16 +55,12 @@ if (isset($_SESSION["message"])) {
     <script src="./src/js/chart.js"></script>
     <script src="./src/js/docx-preview.js"></script>
     <script src="./src/js/xlsx.full.min.js"></script>
-    <!-- ACE Editor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ace.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ext-themelist.js"></script>
-    <!-- Flatpickr - Date Picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
     <style>
-    /* --- CSS is unchanged, it remains the same as in your original file --- */
     :root {
         --font-family-sans: 'Roboto', sans-serif;
         --radius-default: 10px;
@@ -80,76 +72,166 @@ if (isset($_SESSION["message"])) {
 
     :root,
     body.dark-mode {
-        /* Bảng màu tối mới, lấy cảm hứng từ GitHub Dark & VSCode Dark */
         --bg-primary: #0d1117;
-        /* Nền chính, xám đen rất đậm có ánh xanh */
         --bg-secondary: #161b22;
-        /* Các panel chính, header, sidebar */
         --bg-tertiary: #21262d;
-        /* Nền cho input, các khối phụ */
-
         --text-primary: #c9d1d9;
-        /* Màu chữ trắng ngà, dịu mắt hơn trắng tinh */
         --text-secondary: #8b949e;
-        /* Màu chữ phụ, xám xanh nhạt */
         --text-accent: #58a6ff;
-        /* Màu xanh dương nhấn mạnh, sáng vừa phải */
-
         --border-color: #30363d;
-        /* Viền xám, đủ để phân tách mà không quá sáng */
         --highlight-color: #21262d;
-        /* Màu khi hover, đồng bộ bg-tertiary */
         --selection-color: rgba(56, 139, 253, 0.15);
-        /* Màu chọn, xanh nhạt */
-
         --shadow-color: rgba(0, 0, 0, 0.4);
-        /* Bóng đổ cho chế độ tối */
-
         --danger-color: #f85149;
-        /* Màu đỏ cảnh báo, sáng hơn một chút */
         --danger-color-hover: #da3633;
         --success-color: #3fb950;
-        /* Màu xanh lá thành công, dễ nhìn hơn */
-
+        --warning-color: #ff9500;
         --plyr-color-main: var(--text-accent);
     }
 
     body.light-mode {
-        /* Bảng màu mới, hiện đại và dễ chịu hơn */
         --bg-primary: #f6f8fa;
-        /* Nền xám xanh rất nhạt, sạch sẽ */
         --bg-secondary: #ffffff;
-        /* Các panel chính màu trắng tinh */
         --bg-tertiary: #f0f2f5;
-        /* Nền cho input, các khối phụ */
-
         --text-primary: #1f2328;
-        /* Màu chữ đen đậm, rõ ràng */
         --text-secondary: #57606a;
-        /* Màu chữ phụ, xám xanh */
         --text-accent: #0969da;
-        /* Màu xanh dương nhấn mạnh, chuẩn GitHub/VSCode */
-
         --border-color: #d0d7de;
-        /* Viền xám nhạt, tinh tế */
         --highlight-color: #f0f2f5;
-        /* Màu khi hover, đồng bộ với bg-tertiary */
         --selection-color: rgba(56, 139, 253, 0.15);
-        /* Màu chọn, xanh nhạt hơn */
-
         --shadow-color: rgba(140, 149, 159, 0.15);
-        /* Bóng đổ nhẹ nhàng hơn */
-
         --danger-color: #d73a49;
-        /* Màu đỏ cảnh báo */
         --danger-color-hover: #b92534;
         --success-color: #1a7f37;
-        /* Màu xanh lá thành công */
-
+        --warning-color: #ff9500;
         --plyr-color-main: var(--text-accent);
     }
 
-    /* --- CSS MỚI CHO NỀN ĐỘNG --- */
+    #tab-settings .settings-section {
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    #tab-settings h4 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: var(--text-primary);
+    }
+
+    .user-management-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+
+    .user-management-table th,
+    .user-management-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .user-management-table th {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .user-management-table .actions {
+        display: flex;
+        gap: 5px;
+    }
+
+    .user-management-table .actions .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.8em;
+        border-radius: 6px;
+    }
+
+    .form-switch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-switch label {
+        font-weight: 500;
+    }
+
+    .form-switch .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+    }
+
+    .form-switch .switch input {
+        display: none;
+    }
+
+    .form-switch .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--bg-tertiary);
+        transition: .4s;
+        border-radius: 24px;
+    }
+
+    .form-switch .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    .form-switch input:checked+.slider {
+        background-color: var(--success-color);
+    }
+
+    .form-switch input:checked+.slider:before {
+        transform: translateX(20px);
+    }
+
+    .impersonation-banner {
+        position: fixed;
+        top: var(--header-height);
+        left: 0;
+        width: 100%;
+        background-color: var(--warning-color);
+        color: black;
+        text-align: center;
+        padding: 8px;
+        z-index: 101;
+        font-weight: 500;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .impersonation-banner .btn-stop-impersonating {
+        background-color: rgba(0, 0, 0, 0.2);
+        color: white;
+        border: 1px solid white;
+        padding: 5px 15px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    body.impersonating .main-content {
+        margin-top: 40px;
+    }
+
     .animated-bg {
         position: fixed;
         top: 0;
@@ -157,21 +239,17 @@ if (isset($_SESSION["message"])) {
         width: 100%;
         height: 100%;
         z-index: -1;
-        /* Đặt nó ở lớp dưới cùng */
         --gradient-color-1: #0d1117;
         --gradient-color-2: #161b22;
         --gradient-color-3: #0969da;
         --gradient-color-4: #58a6ff;
-
         background: linear-gradient(-45deg, var(--gradient-color-1), var(--gradient-color-2), var(--gradient-color-3), var(--gradient-color-4));
         background-size: 400% 400%;
         animation: gradient-animation 15s ease infinite;
         opacity: 0.2;
-        /* Giảm độ mờ để không quá chói */
         transition: opacity 0.5s ease;
     }
 
-    /* Định nghĩa animation */
     @keyframes gradient-animation {
         0% {
             background-position: 0% 50%;
@@ -186,27 +264,22 @@ if (isset($_SESSION["message"])) {
         }
     }
 
-    /* Điều chỉnh màu sắc cho chế độ sáng */
     body.light-mode .animated-bg {
         --gradient-color-1: #f6f8fa;
         --gradient-color-2: #ffffff;
         --gradient-color-3: #58a6ff;
         --gradient-color-4: #0969da;
         opacity: 0.15;
-        /* Độ mờ ở chế độ sáng cần nhẹ hơn nữa */
     }
 
-    /* Điều chỉnh màu sắc cho chế độ tối */
     body.dark-mode .animated-bg {
         --gradient-color-1: #0d1117;
         --gradient-color-2: #161b22;
         --gradient-color-3: #1f2328;
         --gradient-color-4: #0969da;
         opacity: 0.1;
-        /* Giảm opacity cho nền tối để dịu mắt hơn */
     }
 
-    /* General Body Styles */
     body {
         font-family: var(--font-family-sans);
         margin: 0;
@@ -237,7 +310,6 @@ if (isset($_SESSION["message"])) {
         }
     }
 
-    /* Header */
     .header {
         background-color: var(--bg-secondary);
         height: var(--header-height);
@@ -295,7 +367,6 @@ if (isset($_SESSION["message"])) {
         white-space: nowrap;
     }
 
-    /* Main Layout */
     .main-content {
         display: flex;
         flex: 1;
@@ -316,7 +387,6 @@ if (isset($_SESSION["message"])) {
         transition: transform var(--transition-speed-normal) var(--transition-timing-function);
     }
 
-    /* Sidebar */
     .sidebar-header .btn-upload {
         width: 100%;
         padding: 12px;
@@ -410,7 +480,6 @@ if (isset($_SESSION["message"])) {
         transition: width var(--transition-speed-normal) var(--transition-timing-function);
     }
 
-    /* Content Area */
     .content-area {
         flex: 1;
         padding: 30px;
@@ -489,7 +558,6 @@ if (isset($_SESSION["message"])) {
         transform: none;
     }
 
-    /* Breadcrumbs */
     .breadcrumbs {
         display: flex;
         align-items: center;
@@ -512,7 +580,6 @@ if (isset($_SESSION["message"])) {
         font-weight: 600;
     }
 
-    /* File Table */
     .file-table {
         width: 100%;
         border-collapse: collapse;
@@ -522,7 +589,6 @@ if (isset($_SESSION["message"])) {
         display: none;
     }
 
-    /* Grid View */
     #grid-view-container {
         display: none;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -634,7 +700,6 @@ if (isset($_SESSION["message"])) {
         display: inline-flex;
     }
 
-    /* Always show on mobile */
     .no-files {
         text-align: center;
         padding: 60px 20px;
@@ -774,6 +839,10 @@ if (isset($_SESSION["message"])) {
         flex-direction: column;
     }
 
+    body.impersonating #details-panel {
+        top: calc(var(--header-height) + 40px);
+    }
+
     #details-panel.active {
         transform: translateX(0);
     }
@@ -832,7 +901,6 @@ if (isset($_SESSION["message"])) {
         word-wrap: break-word;
     }
 
-    /* Trash Actions */
     .trash-actions {
         margin-bottom: 20px;
         text-align: right;
@@ -853,7 +921,6 @@ if (isset($_SESSION["message"])) {
         background-color: var(--danger-color-hover);
     }
 
-    /* Custom Checkbox */
     .custom-checkbox-label {
         position: relative;
         display: inline-block;
@@ -904,7 +971,6 @@ if (isset($_SESSION["message"])) {
         border-color: var(--text-accent);
     }
 
-    /* Modals */
     .modal {
         display: none;
         position: fixed;
@@ -1000,7 +1066,6 @@ if (isset($_SESSION["message"])) {
         color: white;
     }
 
-
     .modal-header .close-button:hover {
         transform: rotate(90deg);
         color: var(--text-primary);
@@ -1010,7 +1075,6 @@ if (isset($_SESSION["message"])) {
         padding: 24px;
         overflow-y: auto;
         flex-grow: 1;
-
     }
 
     .modal-body p {
@@ -1055,7 +1119,6 @@ if (isset($_SESSION["message"])) {
         flex-shrink: 0;
     }
 
-    /* === BẮT ĐẦU KHỐI CSS NÚT ĐÃ NÂNG CẤP === */
     .btn {
         display: inline-flex;
         align-items: center;
@@ -1068,7 +1131,6 @@ if (isset($_SESSION["message"])) {
         font-weight: 500;
         font-size: 0.95em;
         text-decoration: none;
-        /* Quan trọng cho thẻ <a> */
         transition: all var(--transition-speed-fast) var(--transition-timing-function);
     }
 
@@ -1091,8 +1153,6 @@ if (isset($_SESSION["message"])) {
         background-color: var(--danger-color);
         color: white;
     }
-
-    /* === KẾT THÚC KHỐI CSS NÚT ĐÃ NÂNG CẤP === */
 
     #uploadModal .modal-content {
         max-width: 600px;
@@ -1286,7 +1346,6 @@ if (isset($_SESSION["message"])) {
         left: 0;
     }
 
-
     #previewModal .plyr--video,
     #previewModal .plyr--audio {
         max-height: calc(90vh - 55px);
@@ -1469,7 +1528,7 @@ if (isset($_SESSION["message"])) {
         color: #1c1c1e;
     }
 
-    @media (max-width: 992px) {
+    @media (max-width:992px) {
         .toolbar .icon-btn span {
             display: none;
         }
@@ -1488,7 +1547,7 @@ if (isset($_SESSION["message"])) {
         }
     }
 
-    @media (max-width: 768px) {
+    @media (max-width:768px) {
         .content-area {
             padding: 20px;
         }
@@ -1726,11 +1785,9 @@ if (isset($_SESSION["message"])) {
         font-weight: bold;
     }
 
-    /* --- CSS MỚI CHO CHẾ ĐỘ XEM TRƯỚC TOÀN MÀN HÌNH --- */
     body.preview-maximized .header,
     body.preview-maximized .main-content {
         display: none;
-        /* Ẩn giao diện chính của app */
     }
 
     .modal.modal-maximized {
@@ -1748,7 +1805,6 @@ if (isset($_SESSION["message"])) {
         box-shadow: none;
     }
 
-    /* TÙY CHỈNH THANH CUỘN CHO GIAO DIỆN */
     ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -1780,7 +1836,6 @@ if (isset($_SESSION["message"])) {
         scrollbar-color: var(--bg-tertiary) var(--bg-primary);
     }
 
-    /* --- CSS MỚI CHO GIAO DIỆN CHỌN NGÀY HẾT HẠN --- */
     .expiry-options-container {
         display: flex;
         flex-direction: column;
@@ -1824,7 +1879,6 @@ if (isset($_SESSION["message"])) {
     #shareExpiryCustom {
         background-color: var(--bg-tertiary);
         padding-right: 35px;
-        /* Thêm không gian cho nút clear */
         cursor: pointer;
     }
 
@@ -1839,24 +1893,17 @@ if (isset($_SESSION["message"])) {
         cursor: pointer;
         padding: 5px;
         display: none;
-        /* Mặc định ẩn */
     }
 
     .clear-date-btn:hover {
         color: var(--text-primary);
     }
 
-    /* === BẮT ĐẦU KHỐI CSS RESPONSIVE CHO MODAL === */
-
-    @media (max-width: 768px) {
-
-        /* -- Quy tắc chung cho TẤT CẢ các modal trên mobile -- */
+    @media (max-width:768px) {
         .modal-content {
-            /* Chiếm gần hết màn hình, có khoảng đệm nhỏ */
             width: 95%;
             max-width: calc(100vw - 20px);
             max-height: 85vh;
-            /* Giảm padding bên trong để có thêm không gian */
             padding: 0;
         }
 
@@ -1864,18 +1911,14 @@ if (isset($_SESSION["message"])) {
         .modal-body,
         .modal-footer {
             padding: 15px;
-            /* Giảm padding từ 24px xuống 15px */
         }
 
         .modal-header h2 {
             font-size: 1.1em;
-            /* Thu nhỏ tiêu đề modal */
         }
 
-        /* -- Quy tắc ĐẶC BIỆT cho Modal Xem trước (Preview & Code Editor) -- */
         #previewModal .modal-content,
         #previewModal.modal-maximized .modal-content {
-            /* Ép nó chiếm 100% màn hình, không còn là modal nữa */
             width: 100vw;
             height: 100vh;
             max-width: 100%;
@@ -1890,45 +1933,44 @@ if (isset($_SESSION["message"])) {
             padding-bottom: 10px;
         }
 
-        /* Đảm bảo body của modal (chứa code editor) chiếm hết không gian còn lại */
         #previewModal .modal-body {
             height: 100%;
-            /* Rất quan trọng cho ACE editor */
         }
 
-        /* -- Quy tắc cho Modal Thông tin User -- */
         #userInfoModal .tab-nav {
             padding: 0 15px;
-            /* Giảm padding */
         }
 
         #userInfoModal .tab-nav-item {
             padding: 12px 10px;
-            /* Làm cho các tab nhỏ gọn hơn */
             font-size: 0.9em;
         }
 
         #storageChartContainer {
             height: 200px;
-            /* Giảm chiều cao biểu đồ trên mobile */
         }
 
-        /* Ẩn nút maximize không cần thiết trên mobile vì nó đã full screen */
         .hide-on-mobile {
             display: none !important;
         }
     }
-
-    /* === KẾT THÚC KHỐI CSS RESPONSIVE CHO MODAL === */
     </style>
 </head>
 
-<body class="<?php echo isset($_COOKIE["theme"]) &&
-$_COOKIE["theme"] === "light"
-    ? "light-mode"
-    : "dark-mode"; ?>">
+<body
+    class="<?php echo isset($_COOKIE["theme"]) && $_COOKIE["theme"] === "light"
+        ? "light-mode"
+        : "dark-mode"; ?> <?php echo $is_impersonating
+     ? "impersonating"
+     : ""; ?>">
     <div class="animated-bg"></div>
     <div id="toast-container"></div>
+    <?php if ($is_impersonating): ?>
+    <div class="impersonation-banner">
+        <span><i class="fas fa-user-secret"></i> Viewing as <strong><?php echo $current_username; ?></strong>.</span>
+        <a href="#" class="btn-stop-impersonating" onclick="stopImpersonating(event)">Return to Admin</a>
+    </div>
+    <?php endif; ?>
     <div class="header">
         <div class="left-section">
             <button class="menu-toggle icon-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
@@ -1944,9 +1986,7 @@ $_COOKIE["theme"] === "light"
                 </form>
                 <div id="live-search-results"></div>
             </div>
-            <span class="user-info">Hi, <?php echo htmlspecialchars(
-                $_SESSION["username"]
-            ); ?></span>
+            <span class="user-info">Hi, <?php echo $current_username; ?></span>
             <a href="logout.php" class="icon-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
             <button class="icon-btn" onclick="toggleTheme()" title="Toggle Theme"><i class="fas fa-adjust"></i></button>
             <button class="icon-btn" onclick="showUserInfoModal()" title="Information"><i
@@ -2035,8 +2075,6 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
-    <!-- Modals Section -->
     <div id="uploadModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2053,7 +2091,6 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="newFolderModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2073,7 +2110,6 @@ $_COOKIE["theme"] === "light"
             </form>
         </div>
     </div>
-
     <div id="renameModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2093,7 +2129,6 @@ $_COOKIE["theme"] === "light"
             </form>
         </div>
     </div>
-
     <div id="shareModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2153,7 +2188,6 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="moveModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2172,13 +2206,11 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="previewModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="previewModalTitle"></h2>
                 <div id="previewHeaderActions" class="header-actions" style="display: none;"></div>
-                <!-- NÚT MỚI ĐƯỢC THÊM -->
                 <button id="previewMaximizeBtn" class="icon-btn hide-on-mobile" onclick="togglePreviewFullscreen()"
                     title="Maximize" style="font-size: 1em; margin-left: auto; margin-right: 10px;">
                     <i class="fas fa-expand"></i>
@@ -2190,7 +2222,6 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="userInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2201,6 +2232,7 @@ $_COOKIE["theme"] === "light"
                 <div class="tab-nav">
                     <div class="tab-nav-item active" data-tab="overview">Overview</div>
                     <div class="tab-nav-item" data-tab="security">Security</div>
+                    <div class="tab-nav-item" data-tab="settings">Settings</div>
                     <div class="tab-nav-item" data-tab="about">About</div>
                 </div>
                 <div class="tab-content">
@@ -2219,9 +2251,7 @@ $_COOKIE["theme"] === "light"
                             <span><?php echo TOTAL_STORAGE_GB; ?> GB total</span>
                         </div>
                         <div id="storageChartContainer"><canvas id="storageChart"></canvas></div>
-
                     </div>
-                    <!-- === BẮT ĐẦU KHỐI MÃ BỊ THIẾU === -->
                     <div class="tab-pane" id="tab-security">
                         <h4 style="margin-top:0;">Two-Factor Authentication (2FA)</h4>
                         <p style="color: var(--text-secondary); font-size: 0.9em; line-height: 1.6;">
@@ -2232,39 +2262,30 @@ $_COOKIE["theme"] === "light"
                             <i class="fas fa-shield-alt"></i> Manage 2FA Settings
                         </a>
                     </div>
-                    <!-- === KẾT THÚC KHỐI MÃ BỊ THIẾU === -->
+                    <div class="tab-pane" id="tab-settings">
+                    </div>
                     <div class="tab-pane" id="tab-about">
                         <div class="about-section">
                             <div class="logo"><i class="fas fa-cloud-bolt"></i></div>
                             <h3><?php echo APP_NAME; ?></h3>
                             <p>Version 2.0 - "Phoenix"</p>
-
                             <p class="app-description">
                                 A modern, lightweight, and self-hostable cloud storage solution.
                                 Built with a fast Single Page Application experience, focusing on performance,
                                 mobility, and user-friendliness.
                             </p>
-
                             <div class="developer-info">
                                 <h4>Developed & Maintained By</h4>
                                 <p style="font-size: 1.2em; font-weight: 500; margin: 0; padding-bottom: 10px;">
-                                    <!-- THAY TÊN CỦA BẠN VÀO ĐÂY -->
                                     Nam Trần
                                 </p>
                                 <div class="developer-links">
-                                    <!-- THAY CÁC LIÊN KẾT CỦA BẠN VÀO ĐÂY -->
                                     <a href="https://github.com/namtran592005" target="_blank">
                                         <i class="fab fa-github"></i> GitHub
                                     </a>
                                     <a href="https://tranvohoangnam.id.vn/portfolio" target="_blank">
                                         <i class="fas fa-globe"></i> Portfolio
                                     </a>
-                                    <!-- <a href="https://www.facebook.com/namtran5905" target="_blank">
-                                        <i class="fab fa-facebook"></i> Facebook
-                                    </a>
-                                    <a href="https://www.instagram.com/namtran5905/" target="_blank">
-                                        <i class="fab fa-instagram"></i> Instagram
-                                    </a> -->
                                 </div>
                             </div>
                         </div>
@@ -2275,7 +2296,6 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2291,16 +2311,13 @@ $_COOKIE["theme"] === "light"
             </div>
         </div>
     </div>
-
     <div id="actionPopover" class="action-popover"></div>
 </body>
 <script>
-// ===================================================================================
-// JAVASCRIPT SECTION - UPDATED FOR REFACTORED BACKEND
-// ===================================================================================
-
 const G = {
     BASE_URL: '<?php echo BASE_URL; ?>',
+    IS_ADMIN: <?php echo json_encode($is_admin); ?>,
+    IS_IMPERSONATING: <?php echo json_encode($is_impersonating); ?>,
     currentPage: '',
     currentFolderId: 1,
     currentPath: '',
@@ -2311,9 +2328,131 @@ const G = {
     itemsToMove: [],
     destinationFolderId: null
 };
-
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+async function showUserInfoModal() {
+    openModal('userInfoModal');
+    const modal = $('#userInfoModal');
+    modal.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el.classList.remove('active'));
+    modal.querySelector('.tab-nav-item[data-tab="overview"]').classList.add('active');
+    modal.querySelector('#tab-overview').classList.add('active');
+    if (!G.storageChartInstance) {
+        setTimeout(() => renderStorageChart(), 50);
+    }
+    const settingsPane = $('#tab-settings');
+    settingsPane.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+    try {
+        const result = await apiCall('get_settings_data');
+        if (result.success) {
+            if (result.data.isAdmin) {
+                renderAdminSettings(settingsPane, result.data);
+            } else {
+                renderUserSettings(settingsPane, result.data);
+            }
+        } else {
+            settingsPane.innerHTML = `<p class="message error">Could not load settings.</p>`;
+        }
+    } catch (e) {
+        settingsPane.innerHTML = `<p class="message error">Error: ${e.message}</p>`;
+    }
+}
+
+function renderAdminSettings(container, data) {
+    const registrationChecked = data.settings.allow_registration ? 'checked' : '';
+    let usersHtml = data.users.map(user => `
+<tr>
+<td>${escapeHtml(user.username)}</td>
+<td>${user.storage_usage}</td>
+<td>${user.is_locked?'<span style="color:var(--danger-color)">Locked</span>':'Active'}</td>
+<td class="actions">
+<button class="btn btn-sm btn-primary" onclick="impersonateUser('${user.username}')" title="Switch to User"><i class="fas fa-user-secret"></i></button>
+<button class="btn btn-sm" onclick="toggleUserLock('${user.username}')" title="${user.is_locked?'Unlock':'Lock'} User"><i class="fas ${user.is_locked?'fa-lock-open':'fa-lock'}"></i></button>
+<button class="btn btn-sm btn-danger" onclick="deleteUser('${user.username}')" title="Delete User"><i class="fas fa-trash"></i></button>
+</td>
+</tr>`).join('');
+    container.innerHTML = `
+<div class="settings-section">
+<h4>Application Settings</h4>
+<div class="form-switch">
+<label class="switch">
+<input type="checkbox" id="allowRegistrationSwitch" onchange="updateRegistrationStatus(this.checked)" ${registrationChecked}>
+<span class="slider"></span>
+</label>
+<label for="allowRegistrationSwitch">Allow new user registrations</label>
+</div>
+</div>
+<div class="settings-section">
+<h4>User Management</h4>
+${data.users.length>0?`
+<table class="user-management-table">
+<thead><tr><th>Username</th><th>Usage</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>${usersHtml}</tbody>
+</table>`:`<p>No other users found.</p>`}
+</div>`;
+}
+
+function renderUserSettings(container, data) {
+    container.innerHTML = `
+<div class="settings-section">
+<h4>Account Actions</h4>
+<p>Manage your account settings and data.</p>
+<button class="btn" onclick="alert('Password change functionality coming soon.')"><i class="fas fa-key"></i> Change Password</button>
+<button class="btn" onclick="alert('Data export functionality coming soon.')"><i class="fas fa-file-export"></i> Export My Data</button>
+<button class="btn btn-danger" onclick="alert('Account deletion functionality coming soon.')"><i class="fas fa-user-slash"></i> Delete My Account</button>
+</div>`;
+}
+async function updateRegistrationStatus(status) {
+    const result = await apiCall('admin_update_registration', {
+        status: status
+    });
+    if (result.success) {
+        showToast(result.message);
+    }
+}
+async function toggleUserLock(username) {
+    const message = `Are you sure you want to ${event.target.closest('button').title.toLowerCase()}?`;
+    showConfirmModal('Confirm Action', message, async () => {
+        const result = await apiCall('admin_toggle_user_lock', {
+            username: username
+        });
+        if (result.success) {
+            showToast(result.message);
+            showUserInfoModal();
+        }
+    });
+}
+async function deleteUser(username) {
+    const message =
+        `This will permanently delete the user '${username}' and all of their data. This action cannot be undone. Are you sure?`;
+    showConfirmModal('Confirm Deletion', message, async () => {
+        const result = await apiCall('admin_delete_user', {
+            username: username
+        });
+        if (result.success) {
+            showToast(result.message);
+            showUserInfoModal();
+        }
+    });
+}
+async function impersonateUser(username) {
+    const message =
+        `You are about to switch to and manage files for '${username}'. Your admin session will be temporarily paused. Proceed?`;
+    showConfirmModal('Confirm Switch User', message, async () => {
+        const result = await apiCall('admin_impersonate_user', {
+            username: username
+        });
+        if (result.success) {
+            window.location.reload();
+        }
+    });
+}
+async function stopImpersonating(event) {
+    event.preventDefault();
+    const result = await apiCall('admin_stop_impersonating');
+    if (result.success) {
+        window.location.reload();
+    }
+}
 
 function showToast(message, type = 'success') {
     const container = $('#toast-container');
@@ -2327,11 +2466,9 @@ function showToast(message, type = 'success') {
         toast.addEventListener('transitionend', () => toast.remove());
     }, 4000);
 }
-
 async function apiCall(action, data = {}, method = 'POST', showToastOnError = true) {
     try {
         const isJson = !(data instanceof FormData) && method === 'POST';
-
         const response = await fetch('api.php' + (method === 'GET' ? '?' + new URLSearchParams({
             action,
             ...data
@@ -2345,7 +2482,6 @@ async function apiCall(action, data = {}, method = 'POST', showToastOnError = tr
                 ...data
             }) : data) : undefined
         });
-
         if (!response.ok) {
             const errorText = await response.text();
             try {
@@ -2355,9 +2491,7 @@ async function apiCall(action, data = {}, method = 'POST', showToastOnError = tr
                 throw new Error(errorText || `HTTP error! Status: ${response.status}`);
             }
         }
-
         return await response.json();
-
     } catch (error) {
         console.error('API Call Error:', {
             action,
@@ -2370,14 +2504,10 @@ async function apiCall(action, data = {}, method = 'POST', showToastOnError = tr
         return Promise.reject(error);
     }
 }
-
 async function batchRemoveShareLinks() {
     const selectedItems = $$('.selectable.selected');
     if (selectedItems.length === 0) return;
-
-    // Lấy file_id (được lưu trong data-id)
     const selectedFileIds = selectedItems.map(el => el.dataset.id);
-
     const message =
         `Are you sure you want to stop sharing ${selectedFileIds.length} item(s)? The public links will no longer work.`;
     showConfirmModal('Confirm Unshare', message, async () => {
@@ -2386,26 +2516,21 @@ async function batchRemoveShareLinks() {
         });
         if (result.success) {
             showToast(result.message);
-            // Tải lại view "Shared" để cập nhật danh sách
             navigateToPath('?view=shared', true);
         }
     });
 }
 
-
 function renderMainContent(data) {
     G.currentPage = data.view;
     G.currentFolderId = data.currentFolderId;
     G.currentPath = data.currentPath;
-
     $('#page-title').textContent = data.pageTitle;
     $('#page-stats').textContent = `${data.items.length} items`;
     document.title = `${data.pageTitle} - <?php echo APP_NAME; ?>`;
-
     $$('.sidebar-nav-item a').forEach(a => a.classList.remove('active'));
     const activeLink = $(`.sidebar-nav-item a[data-view="${data.view}"]`);
     if (activeLink) activeLink.classList.add('active');
-
     const mainArea = $('#main-content-area');
     let breadcrumbsHTML = '';
     if (data.view === 'browse' && data.breadcrumbs.length > 0) {
@@ -2421,27 +2546,20 @@ function renderMainContent(data) {
         });
         breadcrumbsHTML += `</div>`;
     }
-
     let trashActionsHTML = '';
     if (data.view === 'trash' && data.items.length > 0) {
         trashActionsHTML =
             `<div class="trash-actions"><button type="button" class="btn-clean" onclick="confirmEmptyTrash()"><i class="fas fa-broom"></i> Empty Trash</button></div>`;
     }
-
     $('#newFolderForm input[name="parent_id"]').value = G.currentFolderId;
-
-    // --- CẬP NHẬT LOGIC HIỂN THỊ NÚT ---
     const newFolderBtn = $('.toolbar .left-actions .icon-btn[onclick="openNewFolderModal()"]');
     const batchRestoreBtn = $('#batch-restore-btn');
     const batchDeleteBtn = $('#batch-delete-btn');
     const batchMoveBtn = $('#batch-move-btn');
     const batchDownloadBtn = $('#batch-download-btn');
     const batchUnshareBtn = $('#batch-unshare-btn');
-
-    // Ẩn tất cả các nút hành động theo mặc định, sau đó bật lại các nút cần thiết cho view hiện tại
     [newFolderBtn, batchRestoreBtn, batchDeleteBtn, batchMoveBtn, batchDownloadBtn, batchUnshareBtn].forEach(btn => btn
         .style.display = 'none');
-
     if (data.view === 'browse' || data.view === 'recents' || data.view === 'search') {
         if (data.view === 'browse') newFolderBtn.style.display = 'flex';
         batchMoveBtn.style.display = 'flex';
@@ -2456,16 +2574,12 @@ function renderMainContent(data) {
         batchDownloadBtn.style.display = 'flex';
         batchUnshareBtn.style.display = 'flex';
     }
-    // --- KẾT THÚC CẬP NHẬT ---
-
-
     let contentHTML = '';
     if (data.items.length === 0) {
         contentHTML = '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
     } else {
         let tableRows = '';
         let gridItems = '';
-
         if (data.view === 'browse' && data.parentPath !== null) {
             const parentUrl = `?view=browse&path=${encodeURIComponent(data.parentPath)}`;
             tableRows +=
@@ -2473,34 +2587,29 @@ function renderMainContent(data) {
             gridItems +=
                 `<div class="grid-item" data-type="parent-folder" onclick="navigateToPath('${parentUrl}')"><i class="fas fa-level-up-alt grid-icon"></i><span class="grid-name">..</span></div>`;
         }
-
         data.items.forEach(item => {
             tableRows += renderFileRowHTML(item);
             gridItems += renderGridItemHTML(item);
         });
-
         contentHTML = `
-                <div id="file-list-container">
-                    <table class="file-table">
-                        <thead>
-                            <tr>
-                                <th><input style="display: none;" type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)"><label for="select-all-checkbox" class="custom-checkbox-label"></label></th>
-                                <th>Name</th><th>Kind</th><th>Size</th><th>Date Modified</th><th></th>
-                            </tr>
-                        </thead>
-                        <tbody>${tableRows}</tbody>
-                    </table>
-                    <div id="grid-view-container">${gridItems}</div>
-                </div>`;
+<div id="file-list-container">
+<table class="file-table">
+<thead>
+<tr>
+<th><input style="display: none;" type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)"><label for="select-all-checkbox" class="custom-checkbox-label"></label></th>
+<th>Name</th><th>Kind</th><th>Size</th><th>Date Modified</th><th></th>
+</tr>
+</thead>
+<tbody>${tableRows}</tbody>
+</table>
+<div id="grid-view-container">${gridItems}</div>
+</div>`;
     }
-
     mainArea.innerHTML = breadcrumbsHTML + trashActionsHTML + contentHTML;
-
     setViewMode(G.viewMode);
     updateToolbarState();
     closeDetailsPanel();
 }
-
 async function navigateToPath(url, isPopState = false) {
     const fullUrl = new URL(url, G.BASE_URL);
     if (!isPopState) {
@@ -2508,12 +2617,9 @@ async function navigateToPath(url, isPopState = false) {
             path: url
         }, '', url);
     }
-
     $('#main-content-area').innerHTML = '<div class="no-files"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-
     const params = Object.fromEntries(fullUrl.searchParams);
     const data = await apiCall('get_view_data', params, 'GET');
-
     if (data.success) {
         renderMainContent(data);
     } else {
@@ -2535,7 +2641,6 @@ function renderFileRowHTML(item) {
         minute: '2-digit'
     }).replace(',', '');
     const nameEscaped = escapeHtml(item.name);
-
     let nameCellContent;
     if (item.type === 'folder' && (G.currentPage === 'browse' || G.currentPage === 'search')) {
         const path = G.currentPage === 'browse' ? item.relative_path : (item.full_path ? item.full_path + '/' + item
@@ -2546,20 +2651,19 @@ function renderFileRowHTML(item) {
         if (G.currentPage === 'search') {
             const pathInfo = item.full_path ? `in /${escapeHtml(item.full_path)}` : 'in Drive';
             nameCellContent = `<a href="${linkUrl}" title="Go to folder">
-                    <i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i>
-                    <span class="file-text">${nameEscaped}<small style="display: block; color: var(--text-secondary); font-weight: 400; margin-top: 3px;">${pathInfo}</small></span>
-                </a>`;
+<i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i>
+<span class="file-text">${nameEscaped}<small style="display: block; color: var(--text-secondary); font-weight: 400; margin-top: 3px;">${pathInfo}</small></span>
+</a>`;
         }
     } else {
         nameCellContent =
             `<span><i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i><span class="file-text">${nameEscaped}</span></span>`;
     }
-
-    return `<tr class="selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}">
-            <td><input style="display: none;" type="checkbox" id="cb-${item.id}"><label for="cb-${item.id}" class="custom-checkbox-label"></label></td>
-            <td class="file-name-cell">${nameCellContent}</td><td>${kind}</td><td>${size}</td><td>${modifiedDate}</td>
-            <td><div class="file-actions"><button type="button" class="action-btn" title="More" onclick="showActionPopover(this, event)"><i class="fas fa-ellipsis-v"></i></button></div></td>
-        </tr>`;
+    return `<tr class="selectable" draggable="${G.currentPage==='browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id||''}">
+<td><input style="display: none;" type="checkbox" id="cb-${item.id}"><label for="cb-${item.id}" class="custom-checkbox-label"></label></td>
+<td class="file-name-cell">${nameCellContent}</td><td>${kind}</td><td>${size}</td><td>${modifiedDate}</td>
+<td><div class="file-actions"><button type="button" class="action-btn" title="More" onclick="showActionPopover(this, event)"><i class="fas fa-ellipsis-v"></i></button></div></td>
+</tr>`;
 }
 
 function renderGridItemHTML(item) {
@@ -2573,34 +2677,28 @@ function renderGridItemHTML(item) {
     } else if (item.type === 'file') {
         clickHandler = `ondblclick="openPreviewModal(${item.id},'${escapeJS(nameEscaped)}')"`;
     }
-
-    return `<div class="grid-item selectable" draggable="${G.currentPage === 'browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id || ''}" ${clickHandler}>
-            <div class="grid-checkbox-overlay">
-                <input style="display: none;" type="checkbox" id="cb-grid-${item.id}"><label for="cb-grid-${item.id}" class="custom-checkbox-label"></label>
-            </div>
-            <i class="fas ${fileInfo.icon} grid-icon" style="color: ${fileInfo.color};"></i>
-            <span class="grid-name">${nameEscaped}</span>
-        </div>`;
+    return `<div class="grid-item selectable" draggable="${G.currentPage==='browse'}" data-id="${item.id}" data-type="${item.type}" data-name="${nameEscaped}" data-share-id="${item.share_id||''}" ${clickHandler}>
+<div class="grid-checkbox-overlay">
+<input style="display: none;" type="checkbox" id="cb-grid-${item.id}"><label for="cb-grid-${item.id}" class="custom-checkbox-label"></label>
+</div>
+<i class="fas ${fileInfo.icon} grid-icon" style="color: ${fileInfo.color};"></i>
+<span class="grid-name">${nameEscaped}</span>
+</div>`;
 }
-
 async function openMoveModal() {
     G.itemsToMove = $$('.selectable.selected').map(el => parseInt(el.dataset.id));
     if (G.itemsToMove.length === 0) return;
-
     openModal('moveModal');
     const container = $('#folder-tree-container');
     container.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
-
     const result = await apiCall('get_folder_tree', {
         exclude_ids: G.itemsToMove
     });
-
     if (result.success) {
         container.innerHTML = '<ul class="folder-tree">' + renderFolderTree(result.tree) + '</ul>';
     } else {
         container.innerHTML = '<p style="color: var(--danger-color)">Could not load folder tree.</p>';
     }
-
     $('#confirmMoveBtn').disabled = true;
     G.destinationFolderId = null;
 }
@@ -2610,15 +2708,14 @@ function renderFolderTree(nodes) {
     nodes.forEach(node => {
         const hasChildren = node.children && node.children.length > 0;
         html += `
-                <li>
-                    <div class="folder-item" data-id="${node.id}">
-                        ${hasChildren ? '<i class="fas fa-chevron-down toggle-icon"></i>' : '<i class="fas fa-empty toggle-icon" style="width:16px"></i>'}
-                        <i class="fas fa-folder"></i>
-                        <span>${escapeHtml(node.name)}</span>
-                    </div>
-                    ${hasChildren ? `<ul style="display: none;">${renderFolderTree(node.children)}</ul>` : ''}
-                </li>
-            `;
+<li>
+<div class="folder-item" data-id="${node.id}">
+${hasChildren?'<i class="fas fa-chevron-down toggle-icon"></i>':'<i class="fas fa-empty toggle-icon" style="width:16px"></i>'}
+<i class="fas fa-folder"></i>
+<span>${escapeHtml(node.name)}</span>
+</div>
+${hasChildren?`<ul style="display: none;">${renderFolderTree(node.children)}</ul>`:''}
+</li>`;
     });
     return html;
 }
@@ -2636,9 +2733,7 @@ function updateToolbarState() {
     $('#batch-delete-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-download-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-move-btn').classList.toggle('disabled', selectedCount === 0 || G.currentPage === 'trash');
-    // --- THÊM DÒNG NÀY ---
     if ($('#batch-unshare-btn')) $('#batch-unshare-btn').classList.toggle('disabled', selectedCount === 0);
-    // ---
     if ($('#batch-restore-btn')) $('#batch-restore-btn').classList.toggle('disabled', selectedCount === 0);
     const totalRows = $$('.selectable').length;
     const selectAllCheckbox = $('#select-all-checkbox');
@@ -2650,10 +2745,8 @@ function updateToolbarState() {
 function showActionPopover(targetElement, e) {
     e.preventDefault();
     e.stopPropagation();
-
     const itemElement = targetElement.closest('.selectable');
     if (!itemElement) return;
-
     const id = itemElement.dataset.id,
         name = itemElement.dataset.name,
         type = itemElement.dataset.type,
@@ -2662,18 +2755,18 @@ function showActionPopover(targetElement, e) {
     if (G.currentPage === 'trash') {
         content =
             `<button type="button" class="popover-item" onclick="batchRestoreSelectedWrapper(${id})"><i class="fas fa-redo-alt"></i> Restore</button>
-                       <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(true, ${id})"><i class="fas fa-times"></i> Delete Forever</button>`;
+<button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(true, ${id})"><i class="fas fa-times"></i> Delete Forever</button>`;
     } else {
         if (type !== 'folder') {
             content +=
                 `<a class="popover-item" href="api.php?action=download_file&id=${id}"><i class="fas fa-download"></i> Download</a>
-                            <button type="button" class="popover-item" onclick="openShareModal(${id})"><i class="fas fa-share-alt"></i> Share</button>
-                            <button type="button" class="popover-item" onclick="openPreviewModal(${id},'${escapeJS(name)}')"><i class="fas fa-eye"></i> View</button>`;
+<button type="button" class="popover-item" onclick="openShareModal(${id})"><i class="fas fa-share-alt"></i> Share</button>
+<button type="button" class="popover-item" onclick="openPreviewModal(${id},'${escapeJS(name)}')"><i class="fas fa-eye"></i> View</button>`;
         }
         content +=
             `<button type="button" class="popover-item" onclick="openMoveModalWithSingleItem(${id})"><i class="fas fa-folder-open"></i> Move</button>
-                        <button type="button" class="popover-item" onclick="openRenameModal(${id},'${escapeJS(name)}', '${type}')"><i class="fas fa-edit"></i> Rename</button>
-                        <button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(false, ${id})"><i class="fas fa-trash-alt"></i> Trash</button>`;
+<button type="button" class="popover-item" onclick="openRenameModal(${id},'${escapeJS(name)}', '${type}')"><i class="fas fa-edit"></i> Rename</button>
+<button type="button" class="popover-item" onclick="batchDeleteSelectedWrapper(false, ${id})"><i class="fas fa-trash-alt"></i> Trash</button>`;
     }
     const popover = $('#actionPopover');
     popover.innerHTML = content;
@@ -2700,69 +2793,50 @@ function updateUIOnItemChange(idsToRemove = [], itemsToAdd = []) {
     idsToRemove.forEach(id => {
         $$(`.selectable[data-id="${id}"]`).forEach(el => el.remove());
     });
-
     if (itemsToAdd.length > 0) {
         navigateToPath(window.location.search, true);
         return;
     }
-
     if ($$('.selectable').length === 0 && !$('[data-type="parent-folder"]')) {
         const container = $('#file-list-container');
         if (container) container.innerHTML =
             '<div class="no-files"><i class="fas fa-box-open"></i><p>This folder is empty.</p></div>';
     }
-
     const currentItemCount = $$('.selectable').length;
     $('#page-stats').textContent = `${currentItemCount} items`;
     updateToolbarState();
     closeDetailsPanel();
 }
-
-// Biến toàn cục để lưu instance của flatpickr
 let flatpickrInstance = null;
-
 async function openShareModal(fileId) {
     openModal('shareModal');
     $('#shareFileId').value = fileId;
-
     const linkSection = $('#share-link-section');
     const createSection = $('#create-share-link-section');
     const optionsSection = $('#share-options-section');
     const removeBtn = $('#removeShareLinkBtn');
     const saveBtn = $('#saveShareSettingsBtn');
     const linkInput = $('#shareLinkInput');
-
-    // === BẮT ĐẦU NÂNG CẤP LOGIC NGÀY HẾT HẠN ===
     const customDateInput = $('#shareExpiryCustom');
     const clearDateBtn = $('#clearExpiryBtn');
-
-    // Hủy instance cũ nếu có để tránh lỗi
     if (flatpickrInstance) {
         flatpickrInstance.destroy();
     }
-
-    // Khởi tạo Flatpickr
     flatpickrInstance = flatpickr(customDateInput, {
         dateFormat: "Y-m-d",
         minDate: "today",
-        // === LOGIC MỚI: Tự động chọn theme dựa trên chế độ hiện tại ===
         "theme": document.body.classList.contains('dark-mode') ? "dark" : "light",
         onChange: function(selectedDates, dateStr, instance) {
-            // Hiển thị nút xóa khi có ngày được chọn
             clearDateBtn.style.display = dateStr ? 'block' : 'none';
-            // Xóa active khỏi các nút chọn nhanh
             $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
         }
     });
-
     const resetExpiryUI = () => {
         flatpickrInstance.clear();
         clearDateBtn.style.display = 'none';
         $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
     };
-
     clearDateBtn.onclick = resetExpiryUI;
-
     $$('.btn-quick-expiry').forEach(button => {
         button.onclick = () => {
             $$('.btn-quick-expiry').forEach(b => b.classList.remove('active'));
@@ -2773,8 +2847,6 @@ async function openShareModal(fileId) {
             flatpickrInstance.setDate(date, true);
         };
     });
-    // === KẾT THÚC NÂNG CẤP LOGIC NGÀY HẾT HẠN ===
-
     linkSection.style.display = 'none';
     createSection.innerHTML = '<div class="live-search-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
     optionsSection.style.display = 'none';
@@ -2782,25 +2854,20 @@ async function openShareModal(fileId) {
     saveBtn.textContent = 'Create Link';
     $('#share-modal-body').querySelectorAll('input[type="password"]').forEach(i => i.value = '');
     $('#shareAllowDownload').checked = true;
-    resetExpiryUI(); // Reset giao diện chọn ngày
-
+    resetExpiryUI();
     const result = await apiCall('get_share_details', {
         file_id: fileId
     });
-
     if (result.success && result.details) {
         linkSection.style.display = 'block';
         createSection.style.display = 'none';
         optionsSection.style.display = 'block';
         removeBtn.style.display = 'block';
         saveBtn.textContent = 'Update Settings';
-
         linkInput.value = `${G.BASE_URL}share.php?id=${result.details.id}`;
         $('#sharePassword').placeholder = result.details.has_password ? 'Password is set. Enter new to change.' :
             'Protect with a password';
         $('#shareAllowDownload').checked = result.details.allow_download == 1;
-
-        // Đặt ngày hết hạn hiện tại (nếu có)
         if (result.details.expires_at) {
             flatpickrInstance.setDate(result.details.expires_at.split(' ')[0], false);
         }
@@ -2811,7 +2878,6 @@ async function openShareModal(fileId) {
         optionsSection.style.display = 'block';
     }
 }
-
 async function batchDeleteSelected(isPermanent = false) {
     const selectedItems = $$('.selectable.selected');
     if (selectedItems.length === 0) return;
@@ -2831,13 +2897,12 @@ async function batchDeleteSelected(isPermanent = false) {
         }, 300);
         showToast(`${selectedIds.length} item(s) moved to trash.`, 'info');
         apiCall('delete', {
-                ids: selectedIds,
-                force_delete: (G.currentPage === 'trash' || isPermanent)
-            })
-            .catch(error => {
-                showToast(`Failed to delete items: ${error.message}. Restoring view.`, 'danger');
-                navigateToPath(window.location.search, true);
-            });
+            ids: selectedIds,
+            force_delete: (G.currentPage === 'trash' || isPermanent)
+        }).catch(error => {
+            showToast(`Failed to delete items: ${error.message}. Restoring view.`, 'danger');
+            navigateToPath(window.location.search, true);
+        });
     });
 }
 
@@ -2849,12 +2914,11 @@ function batchDeleteSelectedWrapper(isPermanent, id) {
         batchDeleteSelected(isPermanent);
     }
 }
-
 async function batchRestoreSelected() {
     const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
     if (selectedIds.length === 0) return;
     showConfirmModal('Confirm Restore', `Are you sure you want to restore ${selectedIds.length} item(s)?`,
-        async () => {
+async () => {
             const result = await apiCall('restore', {
                 ids: selectedIds
             });
@@ -2997,7 +3061,7 @@ function debounce(func, delay) {
     return function(...args) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), delay);
-    };
+    }
 }
 async function performLiveSearch(query) {
     const resultsContainer = $('#live-search-results');
@@ -3014,7 +3078,7 @@ async function performLiveSearch(query) {
         resultsContainer.innerHTML = result.items.map(item => {
             const fileInfo = getFileIconJS(item.name, item.type === 'folder');
             const link = item.type === 'folder' ?
-                `?view=browse&path=${encodeURIComponent(item.full_path + '/' + item.name)}` :
+                `?view=browse&path=${encodeURIComponent(item.full_path+'/'+item.name)}` :
                 `?view=browse&path=${encodeURIComponent(item.full_path)}`;
             return ` <a href="${link}" class="live-search-item"> <i class="fas ${fileInfo.icon}" style="color: ${fileInfo.color};"></i> <div class="live-search-item-info"> <div class="name">${escapeHtml(item.name)}</div> <div class="path">/${escapeHtml(item.full_path)}</div> </div> </a> `;
         }).join('');
@@ -3026,17 +3090,17 @@ async function performLiveSearch(query) {
 
 function hideLiveSearch() {
     setTimeout(() => {
-        $('#live-search-results').style.display = 'none';
+        if ($('#live-search-results')) {
+            $('#live-search-results').style.display = 'none';
+        }
     }, 200);
 }
 
 function openModal(id) {
-    // THÊM LOGIC MỚI: Tự động đóng popover khi mở modal
     const popover = $('#actionPopover');
     if (popover && popover.classList.contains('show')) {
         popover.classList.remove('show');
     }
-    // Giữ nguyên logic cũ
     $(`#${id}`).classList.add('show');
 }
 
@@ -3044,9 +3108,7 @@ function closeModal(id) {
     const modal = $(`#${id}`);
     if (!modal) return;
     modal.classList.remove('show');
-
     if (id === 'previewModal') {
-        // Hủy các instance media
         if (G.plyrInstance) {
             G.plyrInstance.destroy();
             G.plyrInstance = null;
@@ -3056,15 +3118,11 @@ function closeModal(id) {
             G.aceEditorInstance = null;
         }
         $('#previewContent').innerHTML = '';
-
-        // --- LOGIC MỚI: Reset trạng thái fullscreen khi đóng ---
         if (modal.classList.contains('modal-maximized')) {
             const body = document.body;
             const btnIcon = $('#previewMaximizeBtn i');
-
             modal.classList.remove('modal-maximized');
             body.classList.remove('preview-maximized');
-
             btnIcon.classList.remove('fa-compress');
             btnIcon.classList.add('fa-expand');
             $('#previewMaximizeBtn').title = 'Maximize';
@@ -3074,18 +3132,13 @@ function closeModal(id) {
 
 function toggleTheme() {
     const isLight = document.body.classList.toggle('light-mode');
-    document.cookie = `theme=${isLight ? 'light' : 'dark'}; path=/; max-age=31536000`;
-
-    // Cập nhật biểu đồ
+    document.cookie = `theme=${isLight?'light':'dark'}; path=/; max-age=31536000`;
     if (G.storageChartInstance) {
         G.storageChartInstance.destroy();
         G.storageChartInstance = null;
         renderStorageChart();
     }
-
-    // === LOGIC MỚI: Cập nhật theme của Flatpickr nếu nó đang tồn tại ===
     if (flatpickrInstance) {
-        // Tìm element cha của lịch
         const calendar = flatpickrInstance.calendarContainer;
         if (calendar) {
             if (isLight) {
@@ -3098,7 +3151,6 @@ function toggleTheme() {
         }
     }
 }
-
 const sidebar = $('.sidebar'),
     overlay = $('#overlay');
 
@@ -3123,27 +3175,6 @@ function showConfirmModal(title, message, onConfirmCallback) {
         onConfirmCallback();
     });
     openModal('confirmModal');
-}
-
-function showUserInfoModal() {
-    openModal('userInfoModal');
-
-    // Đặt lại trạng thái các tab về mặc định khi mở modal
-    const modal = $('#userInfoModal');
-    modal.querySelectorAll('.tab-nav-item, .tab-pane').forEach(el => el.classList.remove('active'));
-
-    const overviewTab = modal.querySelector('.tab-nav-item[data-tab="overview"]');
-    const overviewPane = modal.querySelector('#tab-overview');
-
-    if (overviewTab && overviewPane) {
-        overviewTab.classList.add('active');
-        overviewPane.classList.add('active');
-    }
-
-    // Chỉ render biểu đồ KHI tab overview được active VÀ biểu đồ chưa được vẽ
-    if (!G.storageChartInstance) {
-        setTimeout(() => renderStorageChart(), 50); // Thêm một độ trễ nhỏ để đảm bảo modal hiển thị
-    }
 }
 
 function renderStorageChart() {
@@ -3186,7 +3217,7 @@ function renderStorageChart() {
                 },
                 tooltip: {
                     callbacks: {
-                        label: (c) => `${c.label || ''}: ${formatBytesJS(c.parsed || 0)}`
+                        label: (c) => `${c.label||''}: ${formatBytesJS(c.parsed||0)}`
                     }
                 }
             },
@@ -3208,51 +3239,41 @@ function openRenameModal(id, oldName, type) {
     input.focus();
     input.select();
 }
-
 async function saveCodeFromEditor(fileId) {
     if (!G.aceEditorInstance) return;
     const content = G.aceEditorInstance.getValue();
-
     const result = await apiCall('save_file_content', {
         file_id: fileId,
         content: content
     });
-
     if (result.success) {
         showToast(result.message);
-        // Optional: Update size in the details panel if it's open
         const detailsSize = document.querySelector('#details-panel-body dd:nth-of-type(3)');
         if (detailsSize && $('#details-panel').classList.contains('active')) {
             detailsSize.textContent = result.new_size_formatted;
         }
     }
 }
-
 async function openPreviewModal(id, name) {
     const modal = $('#previewModal');
     const modalContent = modal.querySelector('.modal-content');
     openModal('previewModal');
-
     const title = $('#previewModalTitle');
     const content = $('#previewContent');
     const headerActions = $('#previewHeaderActions');
-
     title.textContent = name;
     content.innerHTML =
         '<div style="display:flex;justify-content:center;align-items:center;height:200px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
     headerActions.innerHTML = '';
     headerActions.style.display = 'none';
     modalContent.classList.remove('modal-content-fullscreen');
-
     const d = await apiCall('get_preview_data', {
         id: id
     });
-
     if (!d.success) {
         content.innerHTML = `<p style="padding:20px;">${d.message}</p>`;
         return;
     }
-
     let html = '';
     switch (d.type) {
         case 'pdf_viewer':
@@ -3262,18 +3283,15 @@ async function openPreviewModal(id, name) {
             break;
         case 'client_office_viewer':
             modalContent.classList.add('modal-content-fullscreen');
-            content.innerHTML =
-                `<div style="padding:20px; text-align:center;">
-                    <i class="fas fa-circle-notch fa-spin"></i> Loading document preview...
-                    <p style="font-size:0.8em; color:var(--text-secondary); margin-top:10px;">Please wait, larger files may take a moment.</p>
-                 </div>`;
+            content.innerHTML = `<div style="padding:20px; text-align:center;">
+<i class="fas fa-circle-notch fa-spin"></i> Loading document preview...
+<p style="font-size:0.8em; color:var(--text-secondary); margin-top:10px;">Please wait, larger files may take a moment.</p>
+</div>`;
             try {
                 const response = await fetch(d.data.fileUrl);
                 if (!response.ok) throw new Error('Failed to download file for preview.');
                 const blob = await response.blob();
-
-                content.innerHTML = ''; // Clear loading indicator
-
+                content.innerHTML = '';
                 if (d.data.mimeType.includes('wordprocessingml')) {
                     docx.renderAsync(blob, content);
                 } else if (d.data.mimeType.includes('spreadsheetml') || d.data.mimeType.includes('ms-excel')) {
@@ -3323,7 +3341,6 @@ async function openPreviewModal(id, name) {
             html = `<div id="code-editor-container"></div>`;
             content.innerHTML = html;
             headerActions.style.display = 'flex';
-
             const themeSelector = document.createElement('select');
             themeSelector.id = 'aceThemeSelector';
             const themelist = ace.require("ace/ext/themelist");
@@ -3333,15 +3350,12 @@ async function openPreviewModal(id, name) {
             });
             themeSelector.value = 'ace/theme/tomorrow_night';
             themeSelector.onchange = () => G.aceEditorInstance.setTheme(themeSelector.value);
-
             const saveButton = document.createElement('button');
             saveButton.innerHTML = '<i class="fas fa-save"></i> Save';
             saveButton.className = 'btn btn-save';
             saveButton.onclick = () => saveCodeFromEditor(id);
-
             headerActions.appendChild(themeSelector);
             headerActions.appendChild(saveButton);
-
             G.aceEditorInstance = ace.edit("code-editor-container");
             G.aceEditorInstance.setTheme("ace/theme/tomorrow_night");
             G.aceEditorInstance.session.setMode("ace/mode/" + d.language);
@@ -3358,24 +3372,19 @@ async function openPreviewModal(id, name) {
             break;
     }
 }
-
 async function saveShareSettings() {
     const fileId = $('#shareFileId').value;
     const password = $('#sharePassword').value;
-    // Lấy ngày từ flatpickr instance thay vì input cũ
     const expires_at = flatpickrInstance.selectedDates.length > 0 ? flatpickrInstance.formatDate(flatpickrInstance
         .selectedDates[0], "Y-m-d") : null;
     const allow_download = $('#shareAllowDownload').checked ? 1 : 0;
-
     const data = {
         file_id: fileId,
         allow_download: allow_download
     };
     if (password) data.password = password;
     if (expires_at) data.expires_at = expires_at;
-
     const result = await apiCall('update_share_link', data);
-
     if (result.success) {
         showToast('Share settings saved!');
         $('#shareLinkInput').value = `${G.BASE_URL}share.php?id=${result.share_id}`;
@@ -3388,17 +3397,19 @@ async function saveShareSettings() {
             'Protect with a password';
     }
 }
-
 async function removeShareLink() {
     const fileId = $('#shareFileId').value;
     showConfirmModal('Remove Share Link',
         'Are you sure you want to remove this share link? This will make the link invalid.', async () => {
             const result = await apiCall('remove_share_link', {
-                file_id: fileId
+                file_ids: [fileId]
             });
             if (result.success) {
                 showToast(result.message);
                 closeModal('shareModal');
+                if (G.currentPage === 'shared') {
+                    navigateToPath(window.location.search, true);
+                }
             }
         });
 }
@@ -3429,10 +3440,8 @@ function togglePreviewFullscreen() {
     const modal = $('#previewModal');
     const body = document.body;
     const btnIcon = $('#previewMaximizeBtn i');
-
     modal.classList.toggle('modal-maximized');
     body.classList.toggle('preview-maximized');
-
     if (modal.classList.contains('modal-maximized')) {
         btnIcon.classList.remove('fa-expand');
         btnIcon.classList.add('fa-compress');
@@ -3447,21 +3456,18 @@ function togglePreviewFullscreen() {
 function escapeJS(str) {
     return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+const CHUNK_SIZE = 5 * 1024 * 1024;
 const MAX_PARALLEL_UPLOADS = 3;
 const MAX_RETRIES = 3;
-
 let parentIdForUpload = G.currentFolderId;
 
 function openUploadModal() {
     parentIdForUpload = G.currentFolderId;
     openModal('uploadModal');
 }
-
 const dropZone = $('#drop-zone'),
     fileInput = $('#file-input-chunk'),
     progressList = $('#upload-progress-list');
-
 dropZone.addEventListener('dragover', e => {
     e.preventDefault();
     dropZone.classList.add('dragover');
@@ -3496,68 +3502,55 @@ async function uploadFile(file) {
     const status = item.querySelector('.progress-status');
     const icon = item.querySelector('.status-icon');
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
     status.textContent = 'Preparing...';
-
     const startData = new FormData();
     startData.append('action', 'start_upload');
     startData.append('fileName', file.name);
     startData.append('fileSize', file.size);
     startData.append('mimeType', file.type);
     startData.append('parentId', parentIdForUpload);
-
     const startResult = await apiCall('start_upload', startData, 'POST');
-
     if (!startResult.success) {
         status.textContent = 'Error: ' + startResult.message;
         icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
         return;
     }
-
     const fileId = startResult.fileId;
     const chunkQueue = Array.from({
         length: totalChunks
     }, (_, i) => i);
     let completedChunks = 0;
-
     const uploadWorker = async () => {
         while (chunkQueue.length > 0) {
             const chunkIndex = chunkQueue.shift();
             if (chunkIndex === undefined) continue;
-
             let retries = 0;
             while (retries < MAX_RETRIES) {
                 try {
                     const start = chunkIndex * CHUNK_SIZE;
                     const chunk = file.slice(start, start + CHUNK_SIZE);
-
                     const chunkData = new FormData();
                     chunkData.append('action', 'upload_chunk');
                     chunkData.append('fileId', fileId);
                     chunkData.append('chunkIndex', chunkIndex);
                     chunkData.append('chunk', chunk);
-
                     const chunkResult = await apiCall('upload_chunk', chunkData, 'POST');
                     if (!chunkResult.success) throw new Error(chunkResult.message);
-
                     completedChunks++;
                     updateProgress(completedChunks, totalChunks, bar, status);
                     break;
                 } catch (e) {
                     retries++;
                     if (retries >= MAX_RETRIES) {
-                        // Push failed chunk back to the queue for another worker to try
                         chunkQueue.push(chunkIndex);
-                        throw new Error(`Chunk ${chunkIndex + 1} failed after ${MAX_RETRIES} retries.`);
+                        throw new Error(`Chunk ${chunkIndex+1} failed after ${MAX_RETRIES} retries.`);
                     }
                     await new Promise(r => setTimeout(r, 1000 * retries));
                 }
             }
         }
     };
-
     const workers = Array(MAX_PARALLEL_UPLOADS).fill(null).map(uploadWorker);
-
     try {
         await Promise.all(workers);
     } catch (e) {
@@ -3565,22 +3558,17 @@ async function uploadFile(file) {
         icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
         return;
     }
-
     if (completedChunks < totalChunks) {
         status.textContent = 'Upload failed: Not all chunks were uploaded.';
         icon.innerHTML = `<i class="fas fa-times-circle" style="color:var(--danger-color)"></i>`;
         return;
     }
-
     status.textContent = 'Assembling file...';
-
     const completeData = new FormData();
     completeData.append('action', 'complete_upload');
     completeData.append('fileId', fileId);
     completeData.append('totalChunks', totalChunks);
-
     const completeResult = await apiCall('complete_upload', completeData, 'POST');
-
     if (completeResult.success) {
         status.textContent = 'Complete!';
         icon.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success-color)"></i>`;
@@ -3595,7 +3583,6 @@ async function uploadFile(file) {
     }
 }
 
-
 function updateProgress(chunkNum, totalChunks, bar, status) {
     const percent = totalChunks > 0 ? Math.round((chunkNum / totalChunks) * 100) : 100;
     bar.style.width = `${percent}%`;
@@ -3609,16 +3596,11 @@ function getFileIconJS(name, isFolder = false) {
             color: '#5ac8fa'
         };
     }
-
     const nameLower = name.toLowerCase();
     const extension = nameLower.split('.').pop();
-
-    // Mặc định
     let icon = 'fa-file';
     let color = '#8a8a8e';
-
     const iconMap = {
-        // --- Office & Documents ---
         'pdf': {
             i: 'fa-file-pdf',
             c: '#e62e2e'
@@ -3659,8 +3641,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-alt',
             c: '#a0a0a5'
         },
-
-        // --- Archives ---
         'zip': {
             i: 'fa-file-archive',
             c: '#f0ad4e'
@@ -3681,8 +3661,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-archive',
             c: '#f0ad4e'
         },
-
-        // --- Images ---
         'jpg': {
             i: 'fa-file-image',
             c: '#5cb85c'
@@ -3719,8 +3697,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-image',
             c: '#ffb13b'
         },
-
-        // --- Design Files ---
         'psd': {
             i: 'fa-file-image',
             c: '#3498db'
@@ -3733,8 +3709,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-image',
             c: '#a259ff'
         },
-
-        // --- Audio ---
         'mp3': {
             i: 'fa-file-audio',
             c: '#9b59b6'
@@ -3755,8 +3729,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-audio',
             c: '#9b59b6'
         },
-
-        // --- Video ---
         'mp4': {
             i: 'fa-file-video',
             c: '#e74c3c'
@@ -3777,8 +3749,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-video',
             c: '#e74c3c'
         },
-
-        // --- Code & Text-based Files ---
         'html': {
             i: 'fa-file-code',
             c: '#e44d26'
@@ -3903,8 +3873,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-file-code',
             c: '#384d54'
         },
-
-        // --- Fonts ---
         'ttf': {
             i: 'fa-font',
             c: '#94a2b0'
@@ -3921,8 +3889,6 @@ function getFileIconJS(name, isFolder = false) {
             i: 'fa-font',
             c: '#94a2b0'
         },
-
-        // --- Executables & System ---
         'exe': {
             i: 'fa-cog',
             c: '#34495e'
@@ -3944,20 +3910,16 @@ function getFileIconJS(name, isFolder = false) {
             c: '#a4c639'
         },
     };
-
     if (iconMap[extension]) {
         icon = iconMap[extension].i;
         color = iconMap[extension].c;
     }
-
-    // Xử lý các file không có phần mở rộng
     if (nameLower.indexOf('.') === -1) {
         if (nameLower === 'dockerfile') {
             icon = 'fa-file-code';
             color = '#384d54';
         }
     }
-
     return {
         icon,
         color
@@ -3983,17 +3945,16 @@ function formatBytesJS(bytes, decimals = 2) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
-
 document.addEventListener('DOMContentLoaded', () => {
-    const sessionMessage = <?php echo !empty($session_message) ? $session_message : 'null'; ?>;
+    const sessionMessage = <?php echo !empty($session_message)
+        ? $session_message
+        : "null"; ?>;
     if (sessionMessage) {
         showToast(sessionMessage.text, sessionMessage.type);
     }
-
     navigateToPath(
         `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`,
         true);
-
     document.body.addEventListener('click', e => {
         const link = e.target.closest('a');
         if (link && link.href.includes(G.BASE_URL) && !link.href.includes('download_file') && !link
@@ -4005,13 +3966,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
     window.addEventListener('popstate', e => {
         const initialUrl =
             `?view=<?php echo $initial_view; ?>&path=<?php echo $initial_path; ?>&q=<?php echo $initial_query; ?>`;
         navigateToPath(e.state && e.state.path ? e.state.path : initialUrl, true);
     });
-
     $('.search-form-desktop').addEventListener('submit', e => {
         e.preventDefault();
         const query = e.target.q.value;
@@ -4023,7 +3982,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = e.target.q.value;
         navigateToPath(`?view=search&q=${encodeURIComponent(query)}`);
     });
-
     $('#newFolderForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -4052,7 +4010,6 @@ document.addEventListener('DOMContentLoaded', () => {
             form.reset();
         }
     });
-
     const mainContentArea = $('.content-area');
     mainContentArea.addEventListener('click', (e) => {
         if (document.querySelector('.modal.show')) {
@@ -4108,59 +4065,44 @@ document.addEventListener('DOMContentLoaded', () => {
             showActionPopover(item, e);
         }
     });
-
     const searchInput = $('.search-form-desktop .search-input');
     const debouncedSearch = debounce(performLiveSearch, 300);
     searchInput.addEventListener('input', () => {
         debouncedSearch(searchInput.value);
     });
     searchInput.addEventListener('blur', hideLiveSearch);
-
     window.addEventListener('click', e => {
         if (e.target.classList.contains('modal')) closeModal(e.target.id);
-
         const popover = $('#actionPopover');
         if (popover.classList.contains('show') && !e.target.closest('.action-popover') && !e.target
             .closest('.action-btn')) {
             popover.classList.remove('show');
         }
     });
-
-    // === BẮT ĐẦU KHỐI LOGIC ĐÚNG CHO TAB ===
     $$('.tab-nav-item').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabContainer = tab.closest('.modal-body');
             if (!tabContainer) return;
-
-            // Xóa active class khỏi tất cả các tab và content pane
             tabContainer.querySelectorAll('.tab-nav-item').forEach(el => el.classList.remove(
                 'active'));
             tabContainer.querySelectorAll('.tab-pane').forEach(el => el.classList.remove(
                 'active'));
-
-            // Thêm active class cho tab được click
             tab.classList.add('active');
-
-            // Thêm active class cho content pane tương ứng
             const tabContentId = '#tab-' + tab.dataset.tab;
             const tabContent = tabContainer.querySelector(tabContentId);
             if (tabContent) {
                 tabContent.classList.add('active');
             }
-
-            // Nếu người dùng click vào tab overview và biểu đồ chưa được vẽ, hãy vẽ nó.
             if (tab.dataset.tab === 'overview' && !G.storageChartInstance) {
                 setTimeout(() => renderStorageChart(), 50);
             }
         });
     });
-    // === KẾT THÚC KHỐI LOGIC ĐÚNG CHO TAB ===
-
     $('#folder-tree-container').addEventListener('click', e => {
         const folderItem = e.target.closest('.folder-item');
         if (folderItem) {
             $$('#folder-tree-container .folder-item').forEach(item => item.classList.remove(
-                'selected'));
+            'selected'));
             folderItem.classList.add('selected');
             G.destinationFolderId = parseInt(folderItem.dataset.id);
             $('#confirmMoveBtn').disabled = false;

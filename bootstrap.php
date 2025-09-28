@@ -16,7 +16,8 @@ if (substr_count($_SERVER["HTTP_ACCEPT_ENCODING"], "gzip")) {
 session_start();
 
 // --- Main Configuration ---
-define("DB_FILE", __DIR__ . "/database/database.sqlite");
+// === MODIFIED: The primary DB is now the admin/system DB ===
+define("ADMIN_DB_FILE", __DIR__ . "/database/database.sqlite");
 define("ROOT_FOLDER_ID", 1);
 define("TOTAL_STORAGE_GB", 5);
 define("MAX_FILE_SIZE", 4000 * 1024 * 1024);
@@ -24,8 +25,12 @@ define("APP_NAME", "Nexus Drive");
 
 // --- Authentication Configuration ---
 define("AUTH_ENABLED", true);
-define("ALLOW_REGISTRATION", false);
 define("USERS_FILE", __DIR__ . "/users.php");
+
+// === MODIFIED: Registration is now controlled by a writable config file ===
+$app_config = json_decode(file_get_contents(__DIR__ . '/app_config.json'), true);
+define("ALLOW_REGISTRATION", $app_config['allow_registration'] ?? false);
+
 
 // --- Auto-detect BASE_URL ---
 if (
@@ -45,6 +50,9 @@ $path = rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/") . "/";
 define("BASE_URL", $protocol . $host . $path);
 
 // --- User Loading Logic ---
+if (!is_dir(__DIR__ . "/database")) {
+    mkdir(__DIR__ . "/database", 0777, true);
+}
 if (!file_exists(USERS_FILE)) {
     // Cấu trúc user mới hỗ trợ 2FA
     $initial_users = [
@@ -52,6 +60,7 @@ if (!file_exists(USERS_FILE)) {
             'password' => password_hash('admin', PASSWORD_DEFAULT),
             'tfa_secret' => null,
             'tfa_enabled' => false,
+            'is_locked' => false,
         ]
     ];
     $content = "<?php\n\nreturn " . var_export($initial_users, true) . ";\n";
@@ -64,74 +73,84 @@ if (!file_exists(USERS_FILE)) {
 $auth_users = require USERS_FILE;
 define("AUTH_USERS", $auth_users);
 
-// --- Database Connection and Initialization ---
-if (!is_dir(__DIR__ . "/database")) {
-    mkdir(__DIR__ . "/database", 0777, true);
-}
-try {
-    $db_exists = file_exists(DB_FILE) && filesize(DB_FILE) > 0;
-    $pdo = new PDO("sqlite:" . DB_FILE);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-    $pdo->exec("PRAGMA foreign_keys = ON;");
-    $pdo->exec("PRAGMA auto_vacuum = FULL;");
-
-    if (!$db_exists) {
-        $pdo->beginTransaction();
-        $pdo->exec(
-            "CREATE TABLE `file_system` (`id` INTEGER PRIMARY KEY, `parent_id` INTEGER, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `mime_type` TEXT, `size` INTEGER DEFAULT 0, `content` BLOB, `is_deleted` INTEGER NOT NULL DEFAULT 0, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `modified_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `deleted_at` TEXT, FOREIGN KEY (`parent_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
-        );
-        $pdo->exec(
-            "CREATE TRIGGER update_file_system_modified_at AFTER UPDATE ON file_system FOR EACH ROW BEGIN UPDATE file_system SET modified_at = CURRENT_TIMESTAMP WHERE id = OLD.id; END;"
-        );
-        $pdo->exec(
-            "CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `password` TEXT NULL, `expires_at` TEXT NULL, `allow_download` INTEGER NOT NULL DEFAULT 1, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
-        );
-        $pdo->exec(
-            "CREATE INDEX idx_parent_deleted ON file_system (parent_id, is_deleted);"
-        );
-        $pdo->exec(
-            "INSERT INTO `file_system` (`id`, `name`, `type`, `parent_id`) VALUES (1, 'ROOT', 'folder', NULL)"
-        );
-        $pdo->commit();
-    } else {
-        $stmt = $pdo->query("PRAGMA table_info(share_links)");
-        $columns = $stmt->fetchAll(PDO::FETCH_COLUMN, 1);
-        if (!in_array("password", $columns)) {
-            $pdo->exec("ALTER TABLE share_links ADD COLUMN password TEXT NULL");
-        }
-        if (!in_array("expires_at", $columns)) {
-            $pdo->exec(
-                "ALTER TABLE share_links ADD COLUMN expires_at TEXT NULL"
-            );
-        }
-        if (!in_array("allow_download", $columns)) {
-            $pdo->exec(
-                "ALTER TABLE share_links ADD COLUMN allow_download INTEGER NOT NULL DEFAULT 1"
-            );
-        }
-    }
-
-    // Luôn chạy lệnh này để đảm bảo bảng login_attempts tồn tại.
-    // CREATE TABLE IF NOT EXISTS sẽ không làm gì nếu bảng đã có.
+// === NEW: Function to initialize tables in a new user database ===
+function initialize_user_database($pdo) {
+    $pdo->beginTransaction();
     $pdo->exec(
-        "CREATE TABLE IF NOT EXISTS `login_attempts` (
-            `ip_address` TEXT NOT NULL,
-            `last_attempt_at` INTEGER NOT NULL,
-            `failed_attempts` INTEGER NOT NULL DEFAULT 1,
-            PRIMARY KEY (`ip_address`)
-        );"
+        "CREATE TABLE `file_system` (`id` INTEGER PRIMARY KEY, `parent_id` INTEGER, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `mime_type` TEXT, `size` INTEGER DEFAULT 0, `content` BLOB, `is_deleted` INTEGER NOT NULL DEFAULT 0, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `modified_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, `deleted_at` TEXT, FOREIGN KEY (`parent_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
     );
+    $pdo->exec(
+        "CREATE TRIGGER update_file_system_modified_at AFTER UPDATE ON file_system FOR EACH ROW BEGIN UPDATE file_system SET modified_at = CURRENT_TIMESTAMP WHERE id = OLD.id; END;"
+    );
+    $pdo->exec(
+        "CREATE TABLE `share_links` (`id` TEXT PRIMARY KEY, `file_id` INTEGER NOT NULL, `password` TEXT NULL, `expires_at` TEXT NULL, `allow_download` INTEGER NOT NULL DEFAULT 1, `created_at` TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (`file_id`) REFERENCES `file_system` (`id`) ON DELETE CASCADE);"
+    );
+    $pdo->exec(
+        "CREATE INDEX idx_parent_deleted ON file_system (parent_id, is_deleted);"
+    );
+    $pdo->exec(
+        "INSERT INTO `file_system` (`id`, `name`, `type`, `parent_id`) VALUES (1, 'ROOT', 'folder', NULL)"
+    );
+    $pdo->commit();
+}
 
-} catch (\PDOException $e) {
-    if (strpos($e->getMessage(), "unable to open database file") !== false) {
-        die(
-            "<strong>Configuration Error:</strong> Cannot create or open the database file. Please ensure the application directory is writable."
-        );
-    } else {
-        die("Database connection error: " . $e->getMessage());
+// === NEW: Centralized function for getting a database connection ===
+function get_db_connection($username = null) {
+    if ($username === null) {
+        // Impersonation check
+        if (isset($_SESSION['is_impersonating']) && isset($_SESSION['impersonated_user'])) {
+            $username = $_SESSION['impersonated_user'];
+        } else {
+            $username = $_SESSION['username'] ?? 'admin'; // Default to admin for system tasks
+        }
+    }
+    
+    // Sanitize username to prevent path traversal
+    $username = basename($username);
+
+    $db_file = ($username === 'admin') 
+        ? ADMIN_DB_FILE 
+        : __DIR__ . "/database/{$username}.sqlite";
+
+    try {
+        $db_exists = file_exists($db_file) && filesize($db_file) > 0;
+        $pdo = new PDO("sqlite:" . $db_file);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $pdo->exec("PRAGMA foreign_keys = ON;");
+        $pdo->exec("PRAGMA auto_vacuum = FULL;");
+
+        if (!$db_exists && $username !== 'admin') {
+            initialize_user_database($pdo);
+        }
+        
+        // Always connect to admin DB to ensure system tables exist
+        if ($username == 'admin') {
+             $pdo->exec(
+                "CREATE TABLE IF NOT EXISTS `login_attempts` (
+                    `ip_address` TEXT NOT NULL,
+                    `last_attempt_at` INTEGER NOT NULL,
+                    `failed_attempts` INTEGER NOT NULL DEFAULT 1,
+                    PRIMARY KEY (`ip_address`)
+                );"
+            );
+        }
+        
+        return $pdo;
+    } catch (\PDOException $e) {
+        if (strpos($e->getMessage(), "unable to open database file") !== false) {
+            die(
+                "<strong>Configuration Error:</strong> Cannot create or open the database file for user '{$username}'. Please ensure the application directory is writable."
+            );
+        } else {
+            die("Database connection error: " . $e->getMessage());
+        }
     }
 }
+
+// === MODIFIED: Establish the initial PDO connection for the current context ===
+$pdo = get_db_connection();
+
 
 // --- 2. HELPER FUNCTIONS ---
 
@@ -361,8 +380,13 @@ if (!defined("IS_PUBLIC_PAGE") || IS_PUBLIC_PAGE !== true) {
         $_SESSION["username"] = "Local User";
         return;
     }
-
-    if (
+    
+    // === NEW: Logic to handle admin impersonation session ===
+    if (isset($_SESSION['is_impersonating']) && $_SESSION['is_impersonating'] === true) {
+        // User is an admin impersonating another user.
+        // The DB connection is already switched by get_db_connection().
+        // We can proceed.
+    } elseif (
         !isset($_SESSION["is_logged_in"]) ||
         $_SESSION["is_logged_in"] !== true
     ) {

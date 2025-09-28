@@ -20,6 +20,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if (empty($username) || empty($password)) {
         $error_message = "Username and password cannot be empty.";
+    } elseif (strtolower($username) === 'admin') {
+        $error_message = "The username 'admin' is reserved.";
     } elseif (strlen($username) < 3) {
         $error_message = "Username must be at least 3 characters long.";
     } elseif (preg_match("/[^A-Za-z0-9_]/", $username)) {
@@ -36,14 +38,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             'password' => password_hash($password, PASSWORD_DEFAULT),
             'tfa_secret' => null,
             'tfa_enabled' => false,
+            'is_locked' => false, // === NEW: Add lock status for new users
         ];
 
         $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
 
-        if (file_put_contents(USERS_FILE, $content)) {
-            redirect_with_message("login.php", "Registration successful! You can now log in.", "success");
+        // === MODIFIED: Use file locking for safer writes ===
+        $file_handle = fopen(USERS_FILE, 'w');
+        if (flock($file_handle, LOCK_EX)) {
+            fwrite($file_handle, $content);
+            flock($file_handle, LOCK_UN);
+            fclose($file_handle);
+
+            // === NEW: Create the new user's database ===
+            try {
+                $newUserDb = get_db_connection($username);
+                // The connection function already handles initialization
+                redirect_with_message("login.php", "Registration successful! You can now log in.", "success");
+            } catch (Exception $e) {
+                 $error_message = "User created, but failed to initialize user database: " . $e->getMessage();
+                 // Optionally, you might want to roll back the user creation here
+            }
+
         } else {
-            $error_message = "An error occurred. Could not save the new account.";
+            if ($file_handle) fclose($file_handle);
+            $error_message = "An error occurred. Could not get a lock on the user file.";
         }
     }
 }

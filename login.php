@@ -19,7 +19,9 @@ define('LOGIN_ATTEMPT_LIMIT', 5);
 define('LOGIN_BLOCK_TIME_MINUTES', 15);
 
 $ip_address = $_SERVER['REMOTE_ADDR'];
-$stmt = $pdo->prepare("SELECT failed_attempts, last_attempt_at FROM login_attempts WHERE ip_address = ?");
+// === MODIFIED: Always check login attempts against the admin DB ===
+$admin_pdo = get_db_connection('admin');
+$stmt = $admin_pdo->prepare("SELECT failed_attempts, last_attempt_at FROM login_attempts WHERE ip_address = ?");
 $stmt->execute([$ip_address]);
 $attempt_info = $stmt->fetch();
 
@@ -30,7 +32,7 @@ if ($attempt_info && $attempt_info['failed_attempts'] >= LOGIN_ATTEMPT_LIMIT) {
         $error_message = "Too many failed login attempts. Please try again in {$remaining_time} minutes.";
         goto display_page;
     } else {
-        $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
+        $stmt = $admin_pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
         $stmt->execute([$ip_address]);
     }
 }
@@ -47,13 +49,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $username = $_POST["username"] ?? "";
     $password = $_POST["password"] ?? "";
     $users = AUTH_USERS;
+    $user_data = $users[$username] ?? null;
 
-    if (isset($users[$username]) && is_array($users[$username]) && password_verify($password, $users[$username]['password'])) {
+    // === NEW: Check if account is locked ===
+    if (isset($user_data['is_locked']) && $user_data['is_locked'] === true) {
+        $error_message = "This account has been locked by an administrator.";
+    } elseif (isset($user_data) && is_array($user_data) && password_verify($password, $user_data['password'])) {
         // Mật khẩu đúng, xóa các lần thử thất bại
-        $stmt = $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
+        $stmt = $admin_pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
         $stmt->execute([$ip_address]);
-
-        $user_data = $users[$username];
         
         // Kiểm tra xem người dùng có bật 2FA không
         if (isset($user_data['tfa_enabled']) && $user_data['tfa_enabled'] === true) {
@@ -72,7 +76,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     } else {
         // Mật khẩu sai, ghi lại lần thử thất bại
-        $stmt = $pdo->prepare(
+        $stmt = $admin_pdo->prepare(
             "INSERT INTO login_attempts (ip_address, last_attempt_at, failed_attempts) VALUES (?, ?, 1)
              ON CONFLICT(ip_address) DO UPDATE SET
              failed_attempts = failed_attempts + 1,

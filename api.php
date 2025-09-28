@@ -595,7 +595,7 @@ try {
 
             $clientRenderMimeTypes = [
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-                "application/vnd.ms-excel",
+                "application/ms-excel",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
             ];
 
@@ -785,6 +785,105 @@ try {
                 "message" => count($file_ids) . " share link(s) removed.",
             ];
             break;
+
+        // === NEW: Settings and Admin Actions Start Here ===
+        
+        case "get_settings_data":
+            $currentUser = $_SESSION['username'];
+            $isAdmin = ($currentUser === 'admin' && !isset($_SESSION['is_impersonating']));
+            
+            $data = ['isAdmin' => $isAdmin];
+            
+            if ($isAdmin) {
+                $all_users = require USERS_FILE;
+                $user_list = [];
+                foreach ($all_users as $username => $udata) {
+                    if ($username === 'admin') continue;
+                    $db_file = __DIR__ . "/database/{$username}.sqlite";
+                    $user_list[] = [
+                        'username' => $username,
+                        'is_locked' => $udata['is_locked'] ?? false,
+                        'storage_usage' => file_exists($db_file) ? formatBytes(filesize($db_file)) : 'N/A'
+                    ];
+                }
+                $data['users'] = $user_list;
+                $app_config = json_decode(file_get_contents(__DIR__ . '/app_config.json'), true);
+                $data['settings'] = $app_config;
+            }
+            
+            $response = ['success' => true, 'data' => $data];
+            break;
+
+        case "admin_update_registration":
+            if ($_SESSION['username'] !== 'admin' || isset($_SESSION['is_impersonating'])) throw new Exception('Permission denied.');
+            $new_status = (bool)($input['status'] ?? false);
+            $config_path = __DIR__ . '/app_config.json';
+            $app_config = json_decode(file_get_contents($config_path), true);
+            $app_config['allow_registration'] = $new_status;
+            file_put_contents($config_path, json_encode($app_config, JSON_PRETTY_PRINT));
+            $response = ['success' => true, 'message' => 'Registration status updated.'];
+            break;
+
+        case "admin_toggle_user_lock":
+            if ($_SESSION['username'] !== 'admin' || isset($_SESSION['is_impersonating'])) throw new Exception('Permission denied.');
+            $target_user = $input['username'] ?? null;
+            if (!$target_user || $target_user === 'admin') throw new Exception('Invalid target user.');
+            
+            $users = require USERS_FILE;
+            if (!isset($users[$target_user])) throw new Exception('User not found.');
+            
+            $users[$target_user]['is_locked'] = !($users[$target_user]['is_locked'] ?? false);
+            $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
+            file_put_contents(USERS_FILE, $content);
+
+            $response = ['success' => true, 'message' => "User {$target_user} has been " . ($users[$target_user]['is_locked'] ? 'locked.' : 'unlocked.')];
+            break;
+
+        case "admin_delete_user":
+            if ($_SESSION['username'] !== 'admin' || isset($_SESSION['is_impersonating'])) throw new Exception('Permission denied.');
+            $target_user = $input['username'] ?? null;
+            if (!$target_user || $target_user === 'admin') throw new Exception('Invalid target user.');
+
+            $users = require USERS_FILE;
+            if (!isset($users[$target_user])) throw new Exception('User not found.');
+
+            unset($users[$target_user]);
+            $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
+            file_put_contents(USERS_FILE, $content);
+            
+            $db_file = __DIR__ . "/database/{$target_user}.sqlite";
+            if (file_exists($db_file)) {
+                unlink($db_file);
+            }
+            
+            $response = ['success' => true, 'message' => "User {$target_user} and their data have been deleted."];
+            break;
+
+        case "admin_impersonate_user":
+            if ($_SESSION['username'] !== 'admin' || isset($_SESSION['is_impersonating'])) throw new Exception('Permission denied.');
+            $target_user = $input['username'] ?? null;
+            if (!$target_user) throw new Exception('Invalid target user.');
+            
+            $_SESSION['is_impersonating'] = true;
+            $_SESSION['impersonated_user'] = $target_user;
+            $_SESSION['original_admin'] = $_SESSION['username'];
+            
+            // Switch username for the UI
+            $_SESSION['username'] = $target_user;
+            
+            $response = ['success' => true, 'message' => "Switched to user {$target_user}."];
+            break;
+            
+        case "admin_stop_impersonating":
+            if (!isset($_SESSION['is_impersonating'])) throw new Exception('Not in impersonation mode.');
+            
+            $_SESSION['username'] = $_SESSION['original_admin'];
+            unset($_SESSION['is_impersonating'], $_SESSION['impersonated_user'], $_SESSION['original_admin']);
+
+            $response = ['success' => true, 'message' => 'Returned to admin account.'];
+            break;
+
+        // === END: Settings and Admin Actions ===
 
         case "download_file":
             if (ob_get_level()) {

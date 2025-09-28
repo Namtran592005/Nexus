@@ -1957,8 +1957,7 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
     </style>
 </head>
 
-<body
-    class="<?php echo isset($_COOKIE["theme"]) && $_COOKIE["theme"] === "light"
+<body class="<?php echo isset($_COOKIE["theme"]) && $_COOKIE["theme"] === "light"
         ? "light-mode"
         : "dark-mode"; ?> <?php echo $is_impersonating
      ? "impersonating"
@@ -2918,7 +2917,7 @@ async function batchRestoreSelected() {
     const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
     if (selectedIds.length === 0) return;
     showConfirmModal('Confirm Restore', `Are you sure you want to restore ${selectedIds.length} item(s)?`,
-async () => {
+        async () => {
             const result = await apiCall('restore', {
                 ids: selectedIds
             });
@@ -3178,16 +3177,32 @@ function showConfirmModal(title, message, onConfirmCallback) {
 }
 
 function renderStorageChart() {
-    const storageData = <?php echo json_encode($storageBreakdownForJs); ?>;
-    const ctx = document.getElementById('storageChart').getContext('2d');
+    // === MODIFIED: Add a check for the canvas element before rendering ===
+    const canvas = document.getElementById('storageChart');
+    if (!canvas) {
+        // console.warn("Canvas element 'storageChart' not found. Skipping chart rendering.");
+        return; // Exit if canvas is not present
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        // console.warn("Could not get 2D context for canvas 'storageChart'. Skipping chart rendering.");
+        return; // Exit if context cannot be obtained
+    }
+    // === END MODIFIED ===
+
+    const storageData = <?php echo json_encode($storageBreakdownForJs);?>;
     const isDarkMode = !document.body.classList.contains('light-mode');
     const textColor = isDarkMode ? 'rgba(240, 240, 240, 0.8)' : 'rgba(28, 28, 30, 0.8)';
+
     if (G.storageChartInstance) G.storageChartInstance.destroy();
-    if (storageData.labels.length === 0) {
+
+    // Check if there is data to display, otherwise show a message
+    if (storageData.labels.length === 0 || storageData.data.every(size => size === 0)) {
         $('#storageChartContainer').innerHTML =
             '<p style="text-align:center; color: var(--text-secondary); padding-top: 50px;">No file data to display.</p>';
         return;
     }
+
     G.storageChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -3217,7 +3232,7 @@ function renderStorageChart() {
                 },
                 tooltip: {
                     callbacks: {
-                        label: (c) => `${c.label||''}: ${formatBytesJS(c.parsed||0)}`
+                        label: (c) => `${c.label || ''}: ${formatBytesJS(c.parsed || 0)}`
                     }
                 }
             },
@@ -4102,7 +4117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const folderItem = e.target.closest('.folder-item');
         if (folderItem) {
             $$('#folder-tree-container .folder-item').forEach(item => item.classList.remove(
-            'selected'));
+                'selected'));
             folderItem.classList.add('selected');
             G.destinationFolderId = parseInt(folderItem.dataset.id);
             $('#confirmMoveBtn').disabled = false;

@@ -1,5 +1,3 @@
---- START OF FILE README.md ---
-
 # Nexus Drive: The Multi-User Self-Hosted Cloud
 
 <p align="center">

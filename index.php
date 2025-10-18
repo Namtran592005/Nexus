@@ -3153,18 +3153,46 @@ async function confirmEmptyTrash() {
             }
         });
 }
-let draggedItemId = null;
+let draggedItemIds = []; // Thay đổi từ một ID thành một mảng các ID
 document.addEventListener('dragstart', e => {
     const target = e.target.closest('.selectable[draggable="true"]');
-    if (target) {
-        draggedItemId = target.dataset.id;
+    if (!target) return;
+
+    const selectedItems = $$('.selectable.selected');
+
+    // Kiểm tra xem mục đang kéo có nằm trong nhóm đã chọn không
+    if (selectedItems.length > 0 && target.classList.contains('selected')) {
+        // Nếu có, chúng ta sẽ di chuyển cả nhóm
+        draggedItemIds = selectedItems.map(item => item.dataset.id);
+        // Thêm class 'dragged' cho tất cả các mục đã chọn
+        selectedItems.forEach(item => item.classList.add('dragged'));
+    } else {
+        // Nếu không, chỉ di chuyển mục đang kéo
+        // Bỏ chọn tất cả các mục khác
+        $$('.selectable.selected').forEach(el => {
+            el.classList.remove('selected');
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = false;
+        });
+        // Chọn và kéo chỉ mục hiện tại
+        target.classList.add('selected');
+        const cb = target.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = true;
+
+        draggedItemIds = [target.dataset.id];
         target.classList.add('dragged');
-        e.dataTransfer.setData('text/plain', draggedItemId);
+        updateToolbarState();
     }
+
+    // Dữ liệu truyền đi là một chuỗi JSON của mảng ID
+    e.dataTransfer.setData('application/json', JSON.stringify(draggedItemIds));
+    // Dữ liệu text/plain để tương thích
+    e.dataTransfer.setData('text/plain', `Moving ${draggedItemIds.length} items`);
 });
 document.addEventListener('dragend', e => {
-    const target = e.target.closest('.dragged');
-    if (target) target.classList.remove('dragged');
+    // Xóa class 'dragged' khỏi tất cả các phần tử
+    $$('.selectable.dragged').forEach(item => item.classList.remove('dragged'));
+    draggedItemIds = []; // Reset lại mảng
 });
 document.addEventListener('dragover', e => {
     e.preventDefault();
@@ -3182,14 +3210,28 @@ document.addEventListener('drop', async e => {
     e.preventDefault();
     const dropTarget = e.target.closest('.selectable[data-type="folder"]');
     $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    if (dropTarget && draggedItemId && draggedItemId !== dropTarget.dataset.id) {
+
+    // Đọc mảng ID từ dữ liệu được truyền
+    const itemIdsToMove = JSON.parse(e.dataTransfer.getData('application/json'));
+
+    if (dropTarget && itemIdsToMove.length > 0) {
+        const destinationId = dropTarget.dataset.id;
+
+        // Đảm bảo không kéo một thư mục vào chính nó hoặc vào thư mục con của nó
+        if (itemIdsToMove.includes(destinationId)) {
+            showToast('Cannot move a folder into itself.', 'danger');
+            return;
+        }
+
         const result = await apiCall('move', {
-            item_ids: [draggedItemId],
-            destination_id: dropTarget.dataset.id
+            item_ids: itemIdsToMove,
+            destination_id: destinationId
         });
+
         if (result.success) {
             showToast(result.message);
-            updateUIOnItemChange([draggedItemId]);
+            // Xóa các mục đã di chuyển khỏi giao diện
+            updateUIOnItemChange(itemIdsToMove);
         }
     }
 });
@@ -3650,14 +3692,21 @@ function copyShareLink() {
 
 function toggleSelectAll(isChecked) {
     $$('.selectable').forEach(el => {
+        // Thêm hoặc xóa class 'selected'
         el.classList.toggle('selected', isChecked);
+
+        // Cập nhật trạng thái của checkbox bên trong
         const checkbox = el.querySelector('input[type="checkbox"]');
         if (checkbox) checkbox.checked = isChecked;
     });
+
     updateToolbarState();
+
     if (isChecked && $$('.selectable').length > 0) {
+        // Nếu chọn tất cả, hiển thị chi tiết của mục đầu tiên
         openDetailsPanel($$('.selectable')[0].dataset.id);
     } else {
+        // Nếu bỏ chọn tất cả, đóng bảng chi tiết
         closeDetailsPanel();
     }
 }
@@ -4242,15 +4291,49 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const item = e.target.closest('.selectable');
-        if (!item || e.target.closest('a, button, label, input, .grid-checkbox-overlay') || (e.target
-                .closest('.grid-item') && e.target.closest('.grid-item').getAttribute('onclick')))
-            return;
-        if (!e.ctrlKey && !e.shiftKey) {
-            $$('.selectable.selected').forEach(el => el.classList.remove('selected'));
+        if (!item) return;
+
+        // Xử lý khi click vào checkbox hoặc label của nó
+        if (e.target.closest('.custom-checkbox-label') || e.target.type === 'checkbox') {
+            // Đảo ngược trạng thái selected khi click vào checkbox/label
+            // Trình duyệt đã tự xử lý việc check/uncheck, ta chỉ cần đồng bộ class
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                // Đợi một tick để trạng thái checked của checkbox được cập nhật
+                setTimeout(() => {
+                    item.classList.toggle('selected', checkbox.checked);
+                    updateToolbarState();
+                    if ($$('.selectable.selected').length === 1) {
+                        openDetailsPanel(item.dataset.id);
+                    } else {
+                        closeDetailsPanel();
+                    }
+                }, 0);
+            }
+            return; // Dừng xử lý tại đây
         }
+
+        // Bỏ qua các hành động khác như click vào link, button, menu
+        if (e.target.closest('a, button') || (e.target.closest('.grid-item') && e.target.closest(
+                '.grid-item').getAttribute('onclick'))) {
+            return;
+        }
+
+        // Xử lý khi click vào hàng (không phải checkbox)
+        if (!e.ctrlKey && !e.shiftKey) {
+            // Bỏ chọn tất cả nếu không giữ Ctrl/Shift
+            $$('.selectable.selected').forEach(el => {
+                el.classList.remove('selected');
+                const cb = el.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            });
+        }
+
+        // Thêm/xóa lựa chọn cho mục hiện tại
         item.classList.toggle('selected');
         const checkbox = item.querySelector(`input[type="checkbox"]`);
         if (checkbox) checkbox.checked = item.classList.contains('selected');
+
         updateToolbarState();
         if ($$('.selectable.selected').length === 1) {
             openDetailsPanel(item.dataset.id);

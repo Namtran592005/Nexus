@@ -910,6 +910,9 @@ try {
 
         case "user_delete_account":
             $username = $_SESSION['username'];
+            if (isset($_SESSION['is_impersonating'])) {
+                throw new Exception('Cannot delete account while impersonating.');
+            }
             if ($username === 'admin') {
                 throw new Exception('The admin account cannot be deleted.');
             }
@@ -919,15 +922,24 @@ try {
                 throw new Exception('User not found.');
             }
             
+            // Xóa người dùng khỏi file users.php
             unset($users[$username]);
             $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
             file_put_contents(USERS_FILE, $content, LOCK_EX);
             
+            // === BỔ SUNG LOGIC XÓA FILE DATABASE CỦA NGƯỜI DÙNG ===
             $db_file = __DIR__ . "/database/{$username}.sqlite";
             if (file_exists($db_file)) {
+                // Đảm bảo không còn kết nối nào tới file trước khi xóa
+                if (isset($pdo)) {
+                    $pdo = null;
+                }
+                // Xóa file database
                 unlink($db_file);
             }
+            // === KẾT THÚC BỔ SUNG ===
             
+            // Hủy session và trả về kết quả
             session_destroy();
             $response = ['success' => true, 'message' => 'Your account and all data have been permanently deleted.'];
             break;

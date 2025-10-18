@@ -4,7 +4,7 @@
 // nên sẽ xử lý header sau
 $isDownloadAction =
     isset($_REQUEST["action"]) &&
-    in_array($_REQUEST["action"], ["download_file", "download_archive"]);
+    in_array($_REQUEST["action"], ["download_file", "download_archive", "download_user_archive"]);
 
 if (!$isDownloadAction) {
     require_once "bootstrap.php";
@@ -175,6 +175,7 @@ try {
         case "new_folder":
             $folderName = trim($input["folder_name"] ?? "");
             $parentId = (int) ($input["parent_id"] ?? ROOT_FOLDER_ID);
+            // === MODIFIED: Allow unicode characters using \p{L} (letters) and \p{N} (numbers) with the u (unicode) flag
             $folderName = preg_replace("/[^\p{L}\p{N} _.-]/u", "", $folderName);
             if (empty($folderName)) {
                 throw new Exception("Invalid or empty folder name.");
@@ -219,6 +220,7 @@ try {
             if (!$item) {
                 throw new Exception("Item not found.");
             }
+            // === MODIFIED: Allow unicode characters using \p{L} (letters) and \p{N} (numbers) with the u (unicode) flag
             $sanitizedFilename = preg_replace(
                 "/[^\p{L}\p{N} _.-]/u",
                 "",
@@ -786,7 +788,7 @@ try {
             ];
             break;
 
-        // === NEW: Settings and Admin Actions Start Here ===
+        // === Settings and Admin Actions Start Here ===
         
         case "get_settings_data":
             $currentUser = $_SESSION['username'];
@@ -868,7 +870,6 @@ try {
             $_SESSION['impersonated_user'] = $target_user;
             $_SESSION['original_admin'] = $_SESSION['username'];
             
-            // Switch username for the UI
             $_SESSION['username'] = $target_user;
             
             $response = ['success' => true, 'message' => "Switched to user {$target_user}."];
@@ -883,7 +884,118 @@ try {
             $response = ['success' => true, 'message' => 'Returned to admin account.'];
             break;
 
-        // === END: Settings and Admin Actions ===
+        // === NEW: User Account Management Actions ===
+        case "user_change_password":
+            $current_password = $input['current_password'] ?? '';
+            $new_password = $input['new_password'] ?? '';
+            $username = $_SESSION['username'];
+
+            if (strlen($new_password) < 6) {
+                throw new Exception('New password must be at least 6 characters long.');
+            }
+
+            $users = require USERS_FILE;
+            $user_data = $users[$username] ?? null;
+
+            if (!$user_data || !password_verify($current_password, $user_data['password'])) {
+                throw new Exception('Your current password is not correct.');
+            }
+            
+            $users[$username]['password'] = password_hash($new_password, PASSWORD_DEFAULT);
+            $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
+            file_put_contents(USERS_FILE, $content, LOCK_EX);
+
+            $response = ['success' => true, 'message' => 'Password has been changed successfully.'];
+            break;
+
+        case "user_delete_account":
+            $username = $_SESSION['username'];
+            if ($username === 'admin') {
+                throw new Exception('The admin account cannot be deleted.');
+            }
+
+            $users = require USERS_FILE;
+            if (!isset($users[$username])) {
+                throw new Exception('User not found.');
+            }
+            
+            unset($users[$username]);
+            $content = "<?php\n\nreturn " . var_export($users, true) . ";\n";
+            file_put_contents(USERS_FILE, $content, LOCK_EX);
+            
+            $db_file = __DIR__ . "/database/{$username}.sqlite";
+            if (file_exists($db_file)) {
+                unlink($db_file);
+            }
+            
+            session_destroy();
+            $response = ['success' => true, 'message' => 'Your account and all data have been permanently deleted.'];
+            break;
+
+        // === NEW: File Merging Action ===
+        case "merge_files":
+            $ids = (array) ($input['ids'] ?? []);
+            $new_name = trim($input['new_name'] ?? '');
+            
+            if (count($ids) < 2) {
+                throw new Exception('You must select at least two files to merge.');
+            }
+            if (empty($new_name)) {
+                throw new Exception('You must provide a name for the new merged file.');
+            }
+
+            $pdo->beginTransaction();
+
+            $placeholders = rtrim(str_repeat('?,', count($ids)), ',');
+            $stmt = $pdo->prepare("SELECT id, name, parent_id, mime_type, content FROM file_system WHERE id IN ($placeholders) AND type = 'file' AND is_deleted = 0 ORDER BY name ASC");
+            $stmt->execute($ids);
+            $files = $stmt->fetchAll();
+
+            if (count($files) !== count($ids)) {
+                throw new Exception('One or more selected files could not be found.');
+            }
+
+            $first_file = $files[0];
+            $parent_id = $first_file['parent_id'];
+            $extension = strtolower(pathinfo($first_file['name'], PATHINFO_EXTENSION));
+            $mime_type = $first_file['mime_type'];
+            
+            $allowed_extensions_for_merge = ['txt', 'md', 'csv', 'log', 'json', 'html', 'css', 'js'];
+            if (!in_array($extension, $allowed_extensions_for_merge)) {
+                throw new Exception("Files with the extension '{$extension}' cannot be merged.");
+            }
+
+            $merged_content = "";
+            $separator = "\n\n" . str_repeat('=', 50) . "\n\n";
+
+            foreach ($files as $file) {
+                if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== $extension) {
+                    throw new Exception('All files must have the same extension to be merged.');
+                }
+                $merged_content .= $file['content'] . $separator;
+            }
+            
+            // Remove the last separator
+            $merged_content = rtrim($merged_content, $separator);
+
+            $final_new_name = $new_name . '.' . $extension;
+            $new_size = strlen($merged_content);
+
+            $stmt = $pdo->prepare("SELECT id FROM file_system WHERE name = ? AND parent_id = ? AND is_deleted = 0");
+            $stmt->execute([$final_new_name, $parent_id]);
+            if ($stmt->fetch()) {
+                throw new Exception("A file named '{$final_new_name}' already exists in this location.");
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO file_system (parent_id, name, type, mime_type, size, content) VALUES (?, ?, 'file', ?, ?, ?)");
+            $stmt->execute([$parent_id, $final_new_name, $mime_type, $new_size, $merged_content]);
+            
+            $pdo->commit();
+            
+            $response = ['success' => true, 'message' => count($files) . ' files merged successfully.'];
+            break;
+
+        // === Download Actions ===
 
         case "download_file":
             if (ob_get_level()) {
@@ -948,51 +1060,48 @@ try {
 
             $pdo->commit();
             exit();
-
+        
+        // NEW/MODIFIED: download_user_archive for data export
+        case "download_user_archive":
         case "download_archive":
-            $itemIds = array_map("intval", $_POST["ids"] ?? []);
-            if (empty($itemIds)) {
-                redirect_with_message(
-                    BASE_URL . "index.php",
-                    "No items selected for download.",
-                    "danger"
-                );
+            $itemIds = [];
+            if ($action === 'download_archive') {
+                 $itemIds = array_map("intval", $_POST["ids"] ?? []);
+                 if (empty($itemIds)) {
+                    redirect_with_message(BASE_URL . "index.php", "No items selected for download.", "danger");
+                 }
+            } else { // download_user_archive
+                $stmt = $pdo->prepare("SELECT id FROM file_system WHERE parent_id = ? AND is_deleted = 0");
+                $stmt->execute([ROOT_FOLDER_ID]);
+                $itemIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
             }
 
+            if (empty($itemIds)) {
+                redirect_with_message(BASE_URL . "index.php", "There is no data to export.", "info");
+            }
+            
+            set_time_limit(0);
+            if (ob_get_level()) ob_end_clean();
+
             $zip = new ZipArchive();
-            $zipFileName = "archive_" . time() . ".zip";
+            $zipFileName = "archive_" . $_SESSION['username'] . "_" . time() . ".zip";
             $zipFilePath = sys_get_temp_dir() . "/" . $zipFileName;
 
-            if (
-                $zip->open(
-                    $zipFilePath,
-                    ZipArchive::CREATE | ZipArchive::OVERWRITE
-                ) !== true
-            ) {
+            if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                 die("Could not open archive");
             }
 
-            function addFolderToZip($pdo, $folderId, $zip, $parentPath)
-            {
-                $stmt = $pdo->prepare(
-                    "SELECT id, name, type FROM file_system WHERE parent_id = ? AND is_deleted = 0"
-                );
+            function addFolderToZip($pdo, $folderId, $zip, $parentPath) {
+                $stmt = $pdo->prepare("SELECT id, name, type FROM file_system WHERE parent_id = ? AND is_deleted = 0");
                 $stmt->execute([$folderId]);
                 $items = $stmt->fetchAll();
                 foreach ($items as $item) {
                     $localPath = $parentPath . $item["name"];
                     if ($item["type"] === "folder") {
                         $zip->addEmptyDir($localPath);
-                        addFolderToZip(
-                            $pdo,
-                            $item["id"],
-                            $zip,
-                            $localPath . "/"
-                        );
+                        addFolderToZip($pdo, $item["id"], $zip, $localPath . "/");
                     } else {
-                        $fileStmt = $pdo->prepare(
-                            "SELECT content FROM file_system WHERE id = ?"
-                        );
+                        $fileStmt = $pdo->prepare("SELECT content FROM file_system WHERE id = ?");
                         $fileStmt->execute([$item["id"]]);
                         $fileContent = $fileStmt->fetchColumn();
                         if ($fileContent !== false) {
@@ -1003,25 +1112,16 @@ try {
             }
 
             $placeholders = rtrim(str_repeat("?,", count($itemIds)), ",");
-            $stmt = $pdo->prepare(
-                "SELECT id, name, type FROM file_system WHERE id IN ($placeholders) AND is_deleted = 0"
-            );
+            $stmt = $pdo->prepare("SELECT id, name, type FROM file_system WHERE id IN ($placeholders) AND is_deleted = 0");
             $stmt->execute($itemIds);
             $itemsToArchive = $stmt->fetchAll();
 
             foreach ($itemsToArchive as $item) {
                 if ($item["type"] === "folder") {
                     $zip->addEmptyDir($item["name"]);
-                    addFolderToZip(
-                        $pdo,
-                        $item["id"],
-                        $zip,
-                        $item["name"] . "/"
-                    );
+                    addFolderToZip($pdo, $item["id"], $zip, $item["name"] . "/");
                 } else {
-                    $fileStmt = $pdo->prepare(
-                        "SELECT content FROM file_system WHERE id = ?"
-                    );
+                    $fileStmt = $pdo->prepare("SELECT content FROM file_system WHERE id = ?");
                     $fileStmt->execute([$item["id"]]);
                     $fileContent = $fileStmt->fetchColumn();
                     if ($fileContent !== false) {
@@ -1033,19 +1133,12 @@ try {
             $zip->close();
 
             header("Content-Type: application/zip");
-            header(
-                'Content-Disposition: attachment; filename="' .
-                    $zipFileName .
-                    '"'
-            );
+            header('Content-Disposition: attachment; filename="' . $zipFileName . '"');
             header("Content-Length: " . filesize($zipFilePath));
             header("Pragma: no-cache");
             header("Expires: 0");
 
-            ob_clean();
-            flush();
             readfile($zipFilePath);
-
             unlink($zipFilePath);
             exit();
     }
@@ -1057,7 +1150,9 @@ try {
         http_response_code(400);
         $response = ["success" => false, "message" => $e->getMessage()];
     } else {
-        die("Error: " . $e->getMessage());
+        // For download actions, we can't send JSON, so die with a plain message
+        http_response_code(500);
+        die("Error: " . htmlspecialchars($e->getMessage()));
     }
 }
 

@@ -64,46 +64,100 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
     :root {
         --font-family-sans: 'Roboto', sans-serif;
         --radius-default: 10px;
+        --radius-sm: 6px;
+        --radius-lg: 12px;
         --transition-speed-fast: 0.2s;
         --transition-speed-normal: 0.3s;
         --transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
         --header-height: 60px;
+
+        /* --- New, softer, layered shadows for depth --- */
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+        /* --- New RGB values for transparent colors --- */
+        --accent-rgb: 59, 130, 246;
+        /* Corresponds to #3b82f6 */
     }
 
+    /* ========================================================================
+       == NEW DARK THEME: "Midnight Slate"
+       ======================================================================== */
     :root,
     body.dark-mode {
-        --bg-primary: #0d1117;
-        --bg-secondary: #161b22;
-        --bg-tertiary: #21262d;
-        --text-primary: #c9d1d9;
-        --text-secondary: #8b949e;
-        --text-accent: #58a6ff;
-        --border-color: #30363d;
-        --highlight-color: #21262d;
-        --selection-color: rgba(56, 139, 253, 0.15);
-        --shadow-color: rgba(0, 0, 0, 0.4);
-        --danger-color: #f85149;
-        --danger-color-hover: #da3633;
-        --success-color: #3fb950;
-        --warning-color: #ff9500;
+        --bg-primary: #111214;
+        /* Almost black, cool tone */
+        --bg-secondary: #1a1b1e;
+        /* Cards & sidebar bg */
+        --bg-tertiary: #2c2d31;
+        /* Hover, input fields */
+        --text-primary: #f0f0f1;
+        /* Off-white for main text */
+        --text-secondary: #a0a1a7;
+        /* Grey for metadata */
+        --text-tertiary: #696a70;
+        /* Dimmer grey for paths etc. */
+        --text-accent: #3b82f6;
+        /* A vibrant, modern blue */
+        --accent-hover: #2563eb;
+        /* Darker blue for hover */
+        --border-color: #2c2d31;
+        /* Subtle border */
+        --selection-color: rgba(var(--accent-rgb), 0.15);
+        /* More vibrant selection */
+
+        --danger-color: #ef4444;
+        --danger-color-hover: #dc2626;
+        --success-color: #22c55e;
+        --warning-color: #f59e0b;
+
+        --shadow-color-ambient: rgba(0, 0, 0, 0.4);
+        --shadow-sm: 0 1px 2px 0 var(--shadow-color-ambient);
+        --shadow-md: 0 4px 6px -1px var(--shadow-color-ambient), 0 2px 4px -2px var(--shadow-color-ambient);
+        --shadow-lg: 0 10px 15px -3px var(--shadow-color-ambient), 0 4px 6px -4px var(--shadow-color-ambient);
+        --shadow-xl: 0 20px 25px -5px var(--shadow-color-ambient), 0 8px 10px -6px var(--shadow-color-ambient);
+
         --plyr-color-main: var(--text-accent);
     }
 
+    /* ========================================================================
+       == NEW LIGHT THEME: "Arctic White"
+       ======================================================================== */
     body.light-mode {
-        --bg-primary: #f6f8fa;
+        --bg-primary: #f7f7f8;
+        /* Very light grey background */
         --bg-secondary: #ffffff;
-        --bg-tertiary: #f0f2f5;
-        --text-primary: #1f2328;
-        --text-secondary: #57606a;
-        --text-accent: #0969da;
-        --border-color: #d0d7de;
-        --highlight-color: #f0f2f5;
-        --selection-color: rgba(56, 139, 253, 0.15);
-        --shadow-color: rgba(140, 149, 159, 0.15);
+        /* Pure white for cards */
+        --bg-tertiary: #eef0f2;
+        /* Hover, input fields */
+        --text-primary: #1f2937;
+        /* Dark charcoal for main text */
+        --text-secondary: #6b7280;
+        /* Medium grey for metadata */
+        --text-tertiary: #9ca3af;
+        /* Lighter grey */
+        --text-accent: #2563eb;
+        /* Strong, accessible blue */
+        --accent-hover: #1d4ed8;
+        /* Darker blue for hover */
+        --border-color: #e5e7eb;
+        /* Light, subtle border */
+        --selection-color: rgba(var(--accent-rgb), 0.1);
+        /* Lighter selection */
+
         --danger-color: #d73a49;
         --danger-color-hover: #b92534;
         --success-color: #1a7f37;
-        --warning-color: #ff9500;
+        --warning-color: #f59e0b;
+
+        --shadow-color-ambient: rgba(140, 149, 159, 0.15);
+        --shadow-sm: 0 1px 2px 0 var(--shadow-color-ambient);
+        --shadow-md: 0 4px 6px -1px var(--shadow-color-ambient), 0 2px 4px -2px var(--shadow-color-ambient);
+        --shadow-lg: 0 10px 15px -3px var(--shadow-color-ambient), 0 4px 6px -4px var(--shadow-color-ambient);
+        --shadow-xl: 0 20px 25px -5px var(--shadow-color-ambient), 0 8px 10px -6px var(--shadow-color-ambient);
+
         --plyr-color-main: var(--text-accent);
     }
 
@@ -113,10 +167,21 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         border-bottom: 1px solid var(--border-color);
     }
 
+    #tab-settings .settings-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+
     #tab-settings h4 {
         margin-top: 0;
         margin-bottom: 15px;
         color: var(--text-primary);
+    }
+
+    #tab-settings .button-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
     .user-management-table {
@@ -236,36 +301,30 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         z-index: -1;
-        --gradient-color-1: #0d1117;
-        --gradient-color-2: #161b22;
-        --gradient-color-3: #0969da;
-        --gradient-color-4: #58a6ff;
-        background: linear-gradient(-45deg, var(--gradient-color-1), var(--gradient-color-2), var(--gradient-color-3), var(--gradient-color-4));
-        background-size: 400% 400%;
-        animation: gradient-animation 15s ease infinite;
-        opacity: 0.2;
-        transition: opacity 0.5s ease;
+        --gradient-color-1: rgba(var(--accent-rgb), 0.1);
+        --gradient-color-2: rgba(var(--accent-rgb), 0);
+        background: radial-gradient(circle at 10% 10%, var(--gradient-color-1), var(--gradient-color-2) 30%);
+        animation: subtle-glow 25s ease-in-out infinite alternate;
+        opacity: 0.5;
     }
 
-    @keyframes gradient-animation {
+    @keyframes subtle-glow {
         0% {
-            background-position: 0% 50%;
-        }
-
-        50% {
-            background-position: 100% 50%;
+            transform: scale(1);
+            opacity: 0.5;
         }
 
         100% {
-            background-position: 0% 50%;
+            transform: scale(1.5);
+            opacity: 0.8;
         }
     }
 
     body.light-mode .animated-bg {
-        --gradient-color-1: #f6f8fa;
+        --gradient-color-1: rgba(var(--accent-rgb), 0.05);
         --gradient-color-2: #ffffff;
         --gradient-color-3: #58a6ff;
         --gradient-color-4: #0969da;
@@ -318,7 +377,9 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom: 1px solid var(--border-color);
+        /* OLD: border-bottom: 1px solid var(--border-color); */
+        /* NEW: Use shadow for separation */
+        box-shadow: var(--shadow-sm);
         z-index: 100;
         flex-shrink: 0;
     }
@@ -556,6 +617,12 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         opacity: 0.4;
         cursor: not-allowed;
         transform: none;
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+
+    .toolbar .icon-btn.disabled:hover {
+        border-color: var(--border-color);
     }
 
     .breadcrumbs {
@@ -994,8 +1061,10 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
     .modal-content {
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-color);
-        border-radius: 12px;
-        box-shadow: 0 10px 30px var(--shadow-color);
+        border-radius: var(--radius-lg);
+        /* Larger radius */
+        box-shadow: var(--shadow-xl);
+        /* Stronger shadow */
         max-width: 500px;
         width: 90%;
         max-height: 90vh;
@@ -1091,7 +1160,8 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         font-size: 0.9em;
     }
 
-    .modal-body input[type="text"] {
+    .modal-body input[type="text"],
+    .modal-body input[type="password"] {
         width: 100%;
         box-sizing: border-box;
         padding: 12px 15px;
@@ -1103,9 +1173,12 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         transition: border-color var(--transition-speed-fast);
     }
 
-    .modal-body input[type="text"]:focus {
+    .modal-body input[type="text"]:focus,
+    .modal-body input[type="password"]:focus {
         outline: none;
         border-color: var(--text-accent);
+        box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.2);
+        /* New glow effect */
     }
 
     .modal-footer {
@@ -1136,7 +1209,15 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
 
     .btn:hover {
         transform: translateY(-2px);
-        box-shadow: 0 2px 8px var(--shadow-color);
+        box-shadow: var(--shadow-md);
+        /* Use the new shadow variable */
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
     }
 
     .btn-cancel {
@@ -1152,6 +1233,10 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
     .btn-danger {
         background-color: var(--danger-color);
         color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: var(--danger-color-hover);
     }
 
     #uploadModal .modal-content {
@@ -2043,6 +2128,8 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
                             class="fas fa-folder-plus"></i> <span>New Folder</span></button>
                     <button id="batch-move-btn" class="icon-btn disabled" onclick="openMoveModal()"><i
                             class="fas fa-folder-open"></i> <span>Move</span></button>
+                    <button id="batch-merge-btn" class="icon-btn disabled" onclick="openMergeModal()"><i
+                            class="fas fa-compress-arrows-alt"></i> <span>Merge</span></button>
                     <button id="batch-download-btn" class="icon-btn disabled" onclick="batchDownloadSelected()"><i
                             class="fas fa-file-archive"></i> <span>Download as ZIP</span></button>
                     <button id="batch-restore-btn" class="icon-btn disabled" onclick="batchRestoreSelected()"
@@ -2124,6 +2211,25 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
                 <div class="modal-footer">
                     <button type="button" class="btn btn-cancel" onclick="closeModal('renameModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Rename</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="mergeFilesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Merge Files</h2><button class="close-button" onclick="closeModal('mergeFilesModal')"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form id="mergeFilesForm">
+                <div class="modal-body">
+                    <p id="merge-files-count">You are about to merge X files.</p>
+                    <label for="mergedFileName">New file name (without extension):</label>
+                    <input type="text" id="mergedFileName" name="new_name" required autocomplete="off">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal('mergeFilesModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Merge</button>
                 </div>
             </form>
         </div>
@@ -2257,9 +2363,13 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
                             Add an extra layer of security to your account. Once enabled, you will be required to
                             enter a 6-digit code from your authenticator app each time you log in.
                         </p>
-                        <a href="setup_2fa.php" class="btn btn-primary" style="margin-top: 10px;">
-                            <i class="fas fa-shield-alt"></i> Manage 2FA Settings
-                        </a>
+                        <div class="button-group" style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="openModal('changePasswordModal')"><i
+                                    class="fas fa-key"></i> Change Password</button>
+                            <a href="setup_2fa.php" class="btn btn-primary">
+                                <i class="fas fa-shield-alt"></i> Manage 2FA Settings
+                            </a>
+                        </div>
                     </div>
                     <div class="tab-pane" id="tab-settings">
                     </div>
@@ -2311,12 +2421,95 @@ $is_admin = $_SESSION["username"] === "admin" && !$is_impersonating;
         </div>
     </div>
     <div id="actionPopover" class="action-popover"></div>
+
+    <!-- NEW MODALS FOR USER ACTIONS -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change Password</h2>
+                <button class="close-button" onclick="closeModal('changePasswordModal')"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form id="changePasswordForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="current_password">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new_password">New Password (min. 6 characters)</label>
+                        <input type="password" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_new_password">Confirm New Password</label>
+                        <input type="password" id="confirm_new_password" name="confirm_new_password" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel"
+                        onclick="closeModal('changePasswordModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="exportDataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Export My Data</h2>
+                <button class="close-button" onclick="closeModal('exportDataModal')"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>This will create a ZIP archive of all your files and folders. This process may take some time
+                    depending on the amount of data you have.</p>
+                <p>Your download will begin shortly after you click the "Start Export" button.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('exportDataModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="handleExportData()">
+                    <i class="fas fa-file-archive"></i> Start Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteAccountModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="color: var(--danger-color);"><i class="fas fa-exclamation-triangle"></i> Delete Account</h2>
+                <button class="close-button" onclick="closeModal('deleteAccountModal')"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form id="deleteAccountForm">
+                <div class="modal-body">
+                    <p><strong>This is a permanent action and cannot be undone.</strong></p>
+                    <p>All your files, folders, and shared links will be permanently deleted. Your account will be
+                        removed from the system.</p>
+                    <div class="form-group" style="margin-top:20px;">
+                        <label for="delete-confirm-username">To confirm, please type your username: <strong
+                                style="color: var(--text-primary);"><?php echo $current_username; ?></strong></label>
+                        <input type="text" id="delete-confirm-username" autocomplete="off"
+                            pattern="<?php echo $current_username; ?>">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel"
+                        onclick="closeModal('deleteAccountModal')">Cancel</button>
+                    <button type="submit" id="finalDeleteBtn" class="btn btn-danger" disabled>I understand, delete my
+                        account</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 <script>
 const G = {
     BASE_URL: '<?php echo BASE_URL; ?>',
     IS_ADMIN: <?php echo json_encode($is_admin); ?>,
     IS_IMPERSONATING: <?php echo json_encode($is_impersonating); ?>,
+    CURRENT_USERNAME: '<?php echo $current_username; ?>',
     currentPage: '',
     currentFolderId: 1,
     currentPath: '',
@@ -2393,13 +2586,15 @@ ${data.users.length>0?`
 function renderUserSettings(container, data) {
     container.innerHTML = `
 <div class="settings-section">
-<h4>Account Actions</h4>
-<p>Manage your account settings and data.</p>
-<button class="btn" onclick="alert('Password change functionality coming soon.')"><i class="fas fa-key"></i> Change Password</button>
-<button class="btn" onclick="alert('Data export functionality coming soon.')"><i class="fas fa-file-export"></i> Export My Data</button>
-<button class="btn btn-danger" onclick="alert('Account deletion functionality coming soon.')"><i class="fas fa-user-slash"></i> Delete My Account</button>
+    <h4>Account Actions</h4>
+    <p>Manage your account settings and personal data.</p>
+    <div class="button-group">
+        <button class="btn" onclick="openModal('exportDataModal')"><i class="fas fa-file-export"></i> Export My Data</button>
+        <button class="btn btn-danger" onclick="openModal('deleteAccountModal')"><i class="fas fa-user-slash"></i> Delete My Account</button>
+    </div>
 </div>`;
 }
+
 async function updateRegistrationStatus(status) {
     const result = await apiCall('admin_update_registration', {
         status: status
@@ -2557,11 +2752,14 @@ function renderMainContent(data) {
     const batchMoveBtn = $('#batch-move-btn');
     const batchDownloadBtn = $('#batch-download-btn');
     const batchUnshareBtn = $('#batch-unshare-btn');
-    [newFolderBtn, batchRestoreBtn, batchDeleteBtn, batchMoveBtn, batchDownloadBtn, batchUnshareBtn].forEach(btn => btn
+    const batchMergeBtn = $('#batch-merge-btn');
+    [newFolderBtn, batchRestoreBtn, batchDeleteBtn, batchMoveBtn, batchDownloadBtn, batchUnshareBtn, batchMergeBtn]
+    .forEach(btn => btn
         .style.display = 'none');
     if (data.view === 'browse' || data.view === 'recents' || data.view === 'search') {
         if (data.view === 'browse') newFolderBtn.style.display = 'flex';
         batchMoveBtn.style.display = 'flex';
+        batchMergeBtn.style.display = 'flex';
         batchDownloadBtn.style.display = 'flex';
         batchDeleteBtn.style.display = 'flex';
         batchDeleteBtn.querySelector('span').textContent = 'Delete';
@@ -2728,12 +2926,30 @@ function openMoveModalWithSingleItem(itemId) {
 }
 
 function updateToolbarState() {
-    const selectedCount = $$('.selectable.selected').length;
+    const selectedItems = $$('.selectable.selected');
+    const selectedCount = selectedItems.length;
+
     $('#batch-delete-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-download-btn').classList.toggle('disabled', selectedCount === 0);
     $('#batch-move-btn').classList.toggle('disabled', selectedCount === 0 || G.currentPage === 'trash');
     if ($('#batch-unshare-btn')) $('#batch-unshare-btn').classList.toggle('disabled', selectedCount === 0);
     if ($('#batch-restore-btn')) $('#batch-restore-btn').classList.toggle('disabled', selectedCount === 0);
+
+    // Merge button logic
+    const mergeBtn = $('#batch-merge-btn');
+    let canMerge = false;
+    if (selectedCount >= 2) {
+        const files = selectedItems.filter(el => el.dataset.type === 'file');
+        if (files.length === selectedCount) { // Only files are selected
+            const firstExtension = files[0].dataset.name.split('.').pop().toLowerCase();
+            const mergeableExtensions = ['txt', 'md', 'csv', 'log', 'json', 'html', 'css', 'js'];
+            if (mergeableExtensions.includes(firstExtension)) {
+                canMerge = files.every(file => file.dataset.name.split('.').pop().toLowerCase() === firstExtension);
+            }
+        }
+    }
+    mergeBtn.classList.toggle('disabled', !canMerge);
+
     const totalRows = $$('.selectable').length;
     const selectAllCheckbox = $('#select-all-checkbox');
     if (selectAllCheckbox) {
@@ -3177,18 +3393,14 @@ function showConfirmModal(title, message, onConfirmCallback) {
 }
 
 function renderStorageChart() {
-    // === MODIFIED: Add a check for the canvas element before rendering ===
     const canvas = document.getElementById('storageChart');
     if (!canvas) {
-        // console.warn("Canvas element 'storageChart' not found. Skipping chart rendering.");
-        return; // Exit if canvas is not present
+        return;
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-        // console.warn("Could not get 2D context for canvas 'storageChart'. Skipping chart rendering.");
-        return; // Exit if context cannot be obtained
+        return;
     }
-    // === END MODIFIED ===
 
     const storageData = <?php echo json_encode($storageBreakdownForJs);?>;
     const isDarkMode = !document.body.classList.contains('light-mode');
@@ -3196,7 +3408,6 @@ function renderStorageChart() {
 
     if (G.storageChartInstance) G.storageChartInstance.destroy();
 
-    // Check if there is data to display, otherwise show a message
     if (storageData.labels.length === 0 || storageData.data.every(size => size === 0)) {
         $('#storageChartContainer').innerHTML =
             '<p style="text-align:center; color: var(--text-secondary); padding-top: 50px;">No file data to display.</p>';
@@ -4142,7 +4353,86 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // NEW EVENT LISTENERS FOR USER ACTIONS
+    $('#changePasswordForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const current_password = form.current_password.value;
+        const new_password = form.new_password.value;
+        const confirm_new_password = form.confirm_new_password.value;
+
+        if (new_password !== confirm_new_password) {
+            showToast('New passwords do not match.', 'danger');
+            return;
+        }
+
+        const result = await apiCall('user_change_password', {
+            current_password,
+            new_password
+        });
+        if (result.success) {
+            showToast(result.message);
+            closeModal('changePasswordModal');
+            form.reset();
+        }
+    });
+
+    $('#delete-confirm-username')?.addEventListener('input', (e) => {
+        $('#finalDeleteBtn').disabled = (e.target.value !== G.CURRENT_USERNAME);
+    });
+
+    $('#deleteAccountForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const result = await apiCall('user_delete_account');
+        if (result.success) {
+            alert(result.message); // Use alert as we are about to redirect
+            window.location.href = 'login.php';
+        }
+    });
+
+    $('#mergeFilesForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const selectedIds = $$('.selectable.selected').map(el => el.dataset.id);
+        const new_name = $('#mergedFileName').value;
+
+        const result = await apiCall('merge_files', {
+            ids: selectedIds,
+            new_name: new_name
+        });
+        if (result.success) {
+            showToast(result.message);
+            closeModal('mergeFilesModal');
+            navigateToPath(window.location.search, true);
+        }
+    });
+
 });
+
+function handleExportData() {
+    closeModal('exportDataModal');
+    showToast('Your data export is starting...', 'info');
+    // We use a form to trigger the download, as it's a direct file stream
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'api.php';
+    form.innerHTML = `<input type="hidden" name="action" value="download_user_archive">`;
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+function openMergeModal() {
+    const selectedItems = $$('.selectable.selected');
+    if (selectedItems.length < 2) return;
+
+    const firstFile = selectedItems[0];
+    const extension = firstFile.dataset.name.split('.').pop();
+
+    $('#merge-files-count').textContent = `You are about to merge ${selectedItems.length} .${extension} files.`;
+    $('#mergedFileName').value = `merged_${firstFile.dataset.name.split('.')[0]}`;
+    openModal('mergeFilesModal');
+}
 </script>
 
 </html>
